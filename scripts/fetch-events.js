@@ -148,7 +148,7 @@ async function earnings(syms) {
   const out = process.argv[2] || 'public/events.json', prevUrl = process.argv[3];
   let prev = null;
   if (prevUrl) { try { const r = await fetch(prevUrl, { cache: 'no-store' }); if (r.ok) prev = await r.json(); } catch (_) {} }
-  if (prev && prev.fetchedAt && Date.now() - prev.fetchedAt < REFRESH_MS && process.env.FORCE_EVENTS !== '1' && prev.trials && prev.v === 4 && (!DART_KEY || prev.dart)) {
+  if (prev && prev.fetchedAt && Date.now() - prev.fetchedAt < REFRESH_MS && process.env.FORCE_EVENTS !== '1' && prev.trials && prev.v === 5 && (!DART_KEY || prev.dart)) {
     prev.macro = MACRO; fs.writeFileSync(out, JSON.stringify(prev));
     console.log('일정: 최근 것 재사용 (', Math.round((Date.now() - prev.fetchedAt) / 60000), '분 전)'); return;
   }
@@ -156,7 +156,7 @@ async function earnings(syms) {
   const sb = html.slice(html.indexOf('const SECTORS = ['), html.indexOf('const STOCK_SECTOR'));
   const syms = [...new Set([...sb.matchAll(/\['([^']+)','([^']+)'\]/g)].filter(m => !/ETF/.test(m[2])).map(m => m[1]))];
   try { for (const x of JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'config', 'extra-stocks.json'), 'utf8'))) if (!syms.includes(x.sym)) syms.push(x.sym); } catch (_) {}
-  const res = { v: 4, fetchedAt: Date.now(), earnings: {}, macro: MACRO, bio: {} };
+  const res = { v: 5, fetchedAt: Date.now(), earnings: {}, macro: MACRO, bio: {} };
   try { res.earnings = await earnings(syms); }
   catch (e) { console.log('실적 일정 실패:', e.message); if (prev) res.earnings = prev.earnings || {}; }
   for (const [s, [q, lang]] of Object.entries(BIO)) {
