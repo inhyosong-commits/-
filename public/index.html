@@ -130,7 +130,7 @@ h2 small{font-weight:400;color:var(--text-muted);font-size:12px}
 .ins .conf em{font-style:normal;letter-spacing:1px;color:var(--text-secondary)}
 .ins .chips{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
 .chip{font-size:11.5px;padding:2px 8px;border-radius:6px;background:var(--surface-2);color:var(--text-secondary);cursor:pointer;border:1px solid transparent}
-.chip:hover{border-color:var(--border)}
+.chip:hover{border-color:var(--border)} .chip.on{background:var(--accent);color:#fff}
 .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .ins details{margin-top:6px}
 .ins summary{cursor:pointer;color:var(--accent);font-size:12.5px;list-style:none;padding:4px 0}
@@ -674,7 +674,8 @@ function makeDemo(){
     let p=[0]; for(let i=1;i<N;i++) p.push(p[i-1]+gauss()*sd+sd*0.03);
     const end=p[N-1]; const c=p.map(x=>base*Math.exp(x-end));
     const sh=sec.demo*(0.6+rnd()*0.8); for(let i=0;i<5;i++){ const k=N-5+i; c[k]*=Math.pow(1+sh,(i+1)/5); }
-    items[sym]={t:t.slice(), c, price:c[N-1], marketTime:t[N-1]};
+    const v=[]; for(let i=0;i<60;i++) v.push(Math.round(1e6*Math.exp(gauss()*0.35)*(i===59&&rnd()<0.3?2.6:1)));
+    items[sym]={t:t.slice(), c, v, price:c[N-1], marketTime:t[N-1]};
   }
   return {source:'demo', fetchedAt:Date.now(), items, errors:{}};
 }
@@ -1127,12 +1128,27 @@ function pickData(){
   }
   rows.sort((a,b)=>b.score-a.score);
   if(pickMkt!=='all') rows.splice(0,rows.length,...rows.filter(r=>pickMkt==='kr'?mkOf(r.s)==='kr':mkOf(r.s)!=='kr'));
-  return { secs, A:rows.filter(r=>r.env===1&&r.trend===1), B:rows.filter(r=>r.env===1&&r.trend<=0),
+  if(pickSec!=='all') rows.splice(0,rows.length,...rows.filter(r=>r.sec.id===pickSec));
+  for(const r of rows) Object.assign(r, techOf(r.s));
+  return { secs, all:rows, rows, A:rows.filter(r=>r.env===1&&r.trend===1), B:rows.filter(r=>r.env===1&&r.trend<=0),
     C:rows.filter(r=>r.env===0&&r.trend===1), D:rows.filter(r=>r.env===-1&&r.trend===-1).sort((a,b)=>a.score-b.score) };
 }
 const mkOf = s=> /\.(KS|KQ)$/.test(s)? 'kr' : (META[s]&&META[s].unit==='$'&&!/\./.test(s)&&!/=/.test(s)&&!/\^/.test(s))? 'us' : 'ov';
 const mkBadge = s=> (META[s]&&META[s].stock)? `<span class="mk ${mkOf(s)}">${{kr:'국장',us:'미장',ov:'해외'}[mkOf(s)]}</span>` : '';
-let pickMkt = 'all'; try{ pickMkt = localStorage.getItem('cmPickMkt')||'all'; }catch(_){}
+let pickMkt = 'all', pickSec='all', pickMode='mid';
+try{ pickSec=localStorage.getItem('cmPickSec')||'all'; pickMode=localStorage.getItem('cmPickMode')||'mid'; }catch(_){}
+function techOf(s){
+  const d=DATA[s]; if(!d||!d.c||d.c.length<60) return {};
+  const c=d.c, n=c.length, last=c[n-1];
+  const ma = k=>mean(c.slice(-k));
+  const ma20=ma(20), ma50=ma(50);
+  let g=0,l=0; for(let i=n-14;i<n;i++){ const x=c[i]-c[i-1]; if(x>0) g+=x; else l-=x; } const rsi = l===0?100: 100-100/(1+g/l);
+  const rets=[]; for(let i=n-20;i<n;i++) rets.push(c[i]/c[i-1]-1); const dvol=stdev(rets)*100;
+  const hi20=Math.max(...c.slice(-21,-1)), lo10=Math.min(...c.slice(-10));
+  let vr=null; if(d.v&&d.v.length>=21){ const v=d.v, k=v.length; const avg=mean(v.slice(k-21,k-1)); if(avg>0&&v[k-1]>0) vr=v[k-1]/avg; }
+  const d1=(last/c[n-2]-1)*100, d5=(last/c[n-6]-1)*100;
+  return {ma20,ma50,rsi,dvol,hi20,lo10,vr,d1,d5,last,breakout:last>hi20};
+} try{ pickMkt = localStorage.getItem('cmPickMkt')||'all'; }catch(_){}
 function pickRow(r){
   const on=PREFS.watch.includes(r.s);
   const envT = r.env===1?`<span class="tag g">환경 순풍</span>`: r.env===-1?`<span class="tag b">환경 역풍</span>`:`<span class="tag">환경 중립</span>`;
@@ -1164,13 +1180,94 @@ ${P.B.slice(0,4).map(L).join('\n')||'- 없음'}
 [조심: 환경 역풍 + 하락 흐름]
 ${P.D.slice(0,3).map(L).join('\n')||'- 없음'}`;
 }
+const fmtPx=(s,x)=> x==null?'–': /\.K[SQ]$/.test(s)? Math.round(x).toLocaleString('ko-KR')+'원' : (META[s]?META[s].unit:'$')+x.toLocaleString('en-US',{maximumFractionDigits:2});
+function tradeRow(r, kind){
+  const on=PREFS.watch.includes(r.s);
+  const tags=[];
+  if(kind==='swing'){
+    tags.push(`<span class="tag">RSI ${Math.round(r.rsi)}</span>`, `<span class="tag">20일선 대비 ${pct((r.last/r.ma20-1)*100)}</span>`);
+    if(r.vr) tags.push(`<span class="tag">거래량 평소의 ${r.vr.toFixed(1)}배</span>`);
+  } else {
+    tags.push(`<span class="tag ${r.d1>0?'g':'b'}">최근 거래일 ${pct(r.d1)}</span>`);
+    if(r.vr) tags.push(`<span class="tag ${r.vr>=2?'g':''}">거래량 평소의 ${r.vr.toFixed(1)}배</span>`);
+    tags.push(`<span class="tag">하루 변동폭 ±${r.dvol.toFixed(1)}%</span>`);
+  }
+  const env = r.env===1?'<span class="tag g">업종 순풍</span>':r.env===-1?'<span class="tag b">업종 역풍</span>':'';
+  const stop = kind==='swing'
+    ? `흐름이 깨지는 기준: 20일 평균 ${fmtPx(r.s,r.ma20)} 아래로 마감하면 (최근 10일 저점 ${fmtPx(r.s,r.lo10)})`
+    : `평소 하루 ±${r.dvol.toFixed(1)}% 움직여서, 하루 만에 ${fmtPx(r.s,r.last*(1-r.dvol*2/100))} ~ ${fmtPx(r.s,r.last*(1+r.dvol*2/100))} 범위로 출렁일 수 있어요`;
+  return `<div class="prow" data-sym="${r.s}"><div><div class="pn">${mkBadge(r.s)}${esc(r.name)}<small>${r.sec.name}</small></div>
+    <div class="pw">${env}${tags.join('')}${earnTag(r.s)}<br>${r.why}<br><span class="note">${stop}</span></div></div>
+    <div class="pr">${fmtPx(r.s,r.last)}<br><span class="${dirCls(r.d5)}">5일 ${pct(r.d5)}</span></div>
+    <button class="st ${on?'on':''}" data-star="${r.s}" aria-label="관심종목">${on?'★':'☆'}</button></div>`;
+}
+function swingData(P){
+  const all=P.rows.filter(r=>r.ma20);
+  const pull=all.filter(r=>r.last>r.ma50&&r.ma20>r.ma50&&r.env>=0&&r.rsi>=35&&r.rsi<=58&&(r.d5<=-1.5||Math.abs(r.last/r.ma20-1)<=0.03)&&r.last>=r.ma20*0.95)
+    .map(r=>Object.assign(r,{why:`상승 흐름(50일 평균 위) 속에서 잠깐 쉬어 가는 중 (최근 5일 ${pct(r.d5)}). 다시 오르기 시작하는지 볼 만한 자리예요.`, sc:(r.env)+(58-r.rsi)/20+(r.m3||0)/30}))
+    .sort((a,b)=>b.sc-a.sc);
+  const brk=all.filter(r=>r.breakout&&r.env>=0&&(r.vr==null||r.vr>=1.3)&&r.rsi<75&&!pull.includes(r))
+    .map(r=>Object.assign(r,{why:`최근 20일 중 가장 높은 가격을 뚫고 올라섰어요${r.vr?' (거래량도 평소의 '+r.vr.toFixed(1)+'배)':''}. 새 상승 구간의 시작일 수 있어요.`, sc:(r.vr||1)+r.env}))
+    .sort((a,b)=>b.sc-a.sc);
+  return {pull,brk};
+}
+function dayData(P){
+  const all=P.rows.filter(r=>r.ma20&&r.dvol);
+  const mom=all.filter(r=>r.d1>=2.5&&(r.vr==null||r.vr>=1.8)).map(r=>Object.assign(r,{why:`거래가 몰리면서 강하게 올랐어요. 다음 날도 관심이 이어지는지 장 초반 거래량을 보는 게 일반적이에요.`, sc:r.d1*(r.vr||1)})).sort((a,b)=>b.sc-a.sc);
+  const bounce=all.filter(r=>r.d1<=-4&&r.rsi<35&&(r.vr==null||r.vr>=1.5)).map(r=>Object.assign(r,{why:`짧은 기간에 크게 떨어져 과하게 팔린 상태(RSI ${Math.round(r.rsi)}). 기술적 반등이 나오기도 하지만 더 떨어질 위험도 커요.`, sc:-r.d1})).sort((a,b)=>b.sc-a.sc);
+  const active=all.filter(r=>r.dvol>=2.5&&!mom.includes(r)&&!bounce.includes(r)).sort((a,b)=>b.dvol-a.dvol).map(r=>Object.assign(r,{why:`평소에도 많이 움직이는 종목이라 단타 대상이 되곤 해요.`}));
+  return {mom,bounce,active};
+}
+function tradeBox(title,desc,list,n,kind){
+  if(!list.length) return `<div class="pbox"><h3>${title}</h3><p class="pd">${desc}</p><p class="note">지금 조건에 맞는 종목이 없어요.</p></div>`;
+  return `<div class="pbox"><h3>${title} <span class="note">${list.length}개</span></h3><p class="pd">${desc}</p>${list.slice(0,n).map(r=>tradeRow(r,kind)).join('')}</div>`;
+}
+function tradePrompt(kind){
+  const P=pickData(); const L=r=>`- ${r.name}(${r.s}, ${r.sec.name}): 최근 거래일 ${pct(r.d1)}, 5일 ${pct(r.d5)}, RSI ${Math.round(r.rsi)}${r.vr?', 거래량 평소의 '+r.vr.toFixed(1)+'배':''}`;
+  if(kind==='swing'){ const S=swingData(P);
+    return `스윙(며칠~몇 주) 관점에서 내 대시보드가 고른 후보를 점검해줘. 최신 뉴스와 차트 정보를 검색해서 알려줘.
+[눌림목 후보]
+${S.pull.slice(0,5).map(L).join('\n')||'- 없음'}
+[돌파 후보]
+${S.brk.slice(0,4).map(L).join('\n')||'- 없음'}
+종목마다: ① 최근 움직임의 재료(뉴스) ② 가까운 지지선·저항선 가격 ③ 다가오는 일정(실적 등) ④ 위험 요인. 마지막에 더 볼 만한 순서와 이유.
+전문 용어는 풀어서 쉽게. 매수·매도 추천은 하지 말고 판단 근거 위주로.`; }
+  const D=dayData(P);
+  return `단타(하루~며칠) 관점에서 내 대시보드가 고른 종목들을 점검해줘. 최신 뉴스를 검색해서 알려줘.
+[강한 상승 + 거래량 급증]
+${D.mom.slice(0,5).map(L).join('\n')||'- 없음'}
+[급락 후 과매도]
+${D.bounce.slice(0,3).map(L).join('\n')||'- 없음'}
+종목마다: ① 왜 움직였는지(재료) ② 그 재료가 하루짜리인지 이어질 만한지 ③ 다음 장에서 볼 체크포인트(시초가, 거래량, 관련 뉴스) ④ 위험.
+전문 용어는 풀어서 쉽게. 매수·매도 추천은 하지 말고 판단 근거 위주로.`;
+}
 function renderPick(){
   const el=$('pick'); if(!el) return;
   const P=pickData();
-  const srank = `<div class="pbox"><h3>① 지금 바람이 부는 업종</h3><p class="pd">금리·환율·원자재 등 최근 1개월 거시 흐름이 각 업종에 유리한지 불리한지로 줄 세웠어요. 눌러서 자세히 보기.</p>
-    <div class="srank">${P.secs.map(({sec,st})=>`<span class="chip" data-sec-open="${sec.id}">${sec.name} <span class="wind ${st.wind}">${WIND[st.wind]}</span></span>`).join('')}</div></div>`;
-  const nK=SECTORS.flatMap(x=>x.stocks).filter(([s])=>mkOf(s)==='kr').length;
-  el.innerHTML = `<div class="filters" style="margin-top:4px">${[['all','전체'],['kr','국장 (한국)'],['ov','해외장 (미국 등)']].map(([k,l])=>`<button data-pmk="${k}" class="${pickMkt===k?'on':''}">${l}</button>`).join('')}</div>` + srank
+  const ctl = `<div class="tabs" style="margin-top:4px">${[['day','단타'],['swing','스윙'],['mid','장기']].map(([k,l])=>`<button data-pmode="${k}" class="${pickMode===k?'on':''}">${l}</button>`).join('')}</div>
+    <p class="note" style="margin:0 0 8px">${{day:'하루~며칠 보유. 거래량이 몰리고 크게 움직인 종목',swing:'며칠~몇 주 보유. 오르는 흐름 속 눌림목·돌파 종목',mid:'몇 달 이상 보유. 업종 환경과 큰 흐름이 같은 방향인 종목'}[pickMode]}</p>
+    <div class="filters">${[['all','전체'],['kr','국장'],['ov','해외장']].map(([k,l])=>`<button data-pmk="${k}" class="${pickMkt===k?'on':''}">${l}</button>`).join('')}</div>
+    <div class="srank" style="margin-bottom:8px"><span class="chip ${pickSec==='all'?'on':''}" data-psec="all">전체 업종</span>${P.secs.map(({sec,st})=>`<span class="chip ${pickSec===sec.id?'on':''}" data-psec="${sec.id}">${sec.name} <span class="wind ${st.wind}">${WIND[st.wind]}</span></span>`).join('')}</div>`;
+  if(pickMode==='swing'){
+    const S=swingData(P);
+    el.innerHTML = ctl + `<div class="disc">스윙 후보는 <b>가격 흐름(이동평균, RSI, 거래량)만으로</b> 기계적으로 고른 거예요. 뉴스·실적은 반영 안 돼 있으니 아래 AI 점검으로 꼭 확인하세요. 추천이 아니에요.</div>`
+      + tradeBox('눌림목 후보','오르는 흐름 속에서 잠깐 쉬어 가는 종목. 업종 환경도 나쁘지 않아요.', S.pull, 8, 'swing')
+      + tradeBox('돌파 후보','최근 20일 최고가를 넘어선 종목. 거래량이 같이 늘면 힘이 실린 돌파로 봐요.', S.brk, 6, 'swing')
+      + `<div class="pbox"><h3>AI에게 스윙 후보 점검받기</h3><p class="pd">재료(뉴스), 지지선·저항선, 다가오는 일정, 위험을 확인해 줘요.</p><div class="askrow">${askButtons(tradePrompt('swing'),'swing')}</div></div>`
+      + `<p class="note">용어: 20일 평균 = 최근 20거래일 평균 가격 · RSI = 최근 14일 오른 힘과 내린 힘의 비율 (30 아래 과하게 팔림, 70 위 과하게 삼)</p>`;
+    return;
+  }
+  if(pickMode==='day'){
+    const D=dayData(P);
+    el.innerHTML = ctl + `<div class="disc"><b>단타는 위험이 가장 커요.</b> 이 화면은 하루 안의 움직임(분 단위)을 못 보고, <b>최근 거래일 종가 기준</b>으로 "다음 장에 관심 가질 만한" 종목을 고른 거예요. 장중에는 직접 증권사 앱으로 확인하세요. 추천이 아니에요.</div>`
+      + tradeBox('강한 상승 + 거래량 급증','거래가 평소보다 크게 몰리며 오른 종목. 다음 날에도 관심이 이어지는 경우가 있어요.', D.mom, 8, 'day')
+      + tradeBox('급락 후 과매도','크게 떨어져 과하게 팔린 종목. 반등이 나오기도 하지만 가장 위험한 유형이에요.', D.bounce, 5, 'day')
+      + tradeBox('평소 변동이 큰 종목','하루 움직임이 커서 단타에 자주 쓰이는 종목.', D.active, 6, 'day')
+      + `<div class="pbox"><h3>AI에게 단타 후보 점검받기</h3><p class="pd">왜 움직였는지, 그 재료가 이어질지, 다음 장 체크포인트를 알려 줘요.</p><div class="askrow">${askButtons(tradePrompt('day'),'day')}</div></div>`;
+    return;
+  }
+  const srank='';
+  el.innerHTML = ctl + srank
     + pickBox('② 먼저 살펴볼 후보','업종 환경이 순풍이고, 주가도 상승 흐름(50일 평균 위, 3개월 상승)인 종목. 바람과 흐름이 같은 방향이에요.', P.A, 8)
     + pickBox('③ 지켜볼 후보','업종 환경은 순풍인데 주가는 쉬거나 내려온 종목. 흐름이 돌아서는지 지켜볼 만해요.', P.B, 6)
     + pickBox('④ 주가만 강한 종목','업종 환경은 중립인데 주가는 오르는 종목. 회사 자체 이슈(실적, 수주 등)로 오르는 경우가 많아요.', P.C, 5)
@@ -1722,11 +1819,13 @@ document.addEventListener('click', e=>{
   if(t===$('edit')){ $('edit').classList.remove('open'); return; }
   const of=t.closest('[data-open-f]'); if(of){ const d=document.querySelector(`details[data-g="${of.dataset.openF}"]`); if(d) d.open=true; }
   const og=t.closest('[data-open-g]'); if(og){ const d=document.querySelector(`details[data-g="${og.dataset.openG}"]`); if(d) d.open=true; }
-  const cp=t.closest('[data-copy]'); if(cp){ const prompt = cp.dataset.copy==='hold' ? holdPrompt() : cp.dataset.copy==='pick' ? pickPrompt() : cp.dataset.copy==='cal' ? calPrompt() : $('secm').classList.contains('open') ? sectorPrompt(SECTORS.find(x=>x.id===curSec)) : askPrompt();
+  const cp=t.closest('[data-copy]'); if(cp){ const prompt = cp.dataset.copy==='swing'||cp.dataset.copy==='day' ? tradePrompt(cp.dataset.copy) : cp.dataset.copy==='hold' ? holdPrompt() : cp.dataset.copy==='pick' ? pickPrompt() : cp.dataset.copy==='cal' ? calPrompt() : $('secm').classList.contains('open') ? sectorPrompt(SECTORS.find(x=>x.id===curSec)) : askPrompt();
     navigator.clipboard.writeText(prompt).then(()=>{ cp.textContent='복사됨 ✓'; setTimeout(()=>cp.textContent='질문 복사',1500); }).catch(()=>{ cp.textContent='복사 실패'; }); return; }
   const hp=t.closest('[data-hpick]'); if(hp){ openHoldForm(hp.dataset.hpick, hp.dataset.hname); return; }
   const he=t.closest('[data-hedit]'); if(he){ const s=he.dataset.hedit, h=PREFS.hold[s]; const q=qOf(s); openHoldForm(s,(q&&q.name)||h.name||s); window.scrollTo(0,0); return; }
   const hd=t.closest('[data-hdel]'); if(hd){ delete PREFS.hold[hd.dataset.hdel]; applyPrefs(); return; }
+  const pmo=t.closest('[data-pmode]'); if(pmo){ pickMode=pmo.dataset.pmode; try{localStorage.setItem('cmPickMode',pickMode);}catch(_){} renderPick(); return; }
+  const ps=t.closest('[data-psec]'); if(ps){ pickSec=ps.dataset.psec; try{localStorage.setItem('cmPickSec',pickSec);}catch(_){} renderPick(); return; }
   const pm=t.closest('[data-pmk]'); if(pm){ pickMkt=pm.dataset.pmk; try{localStorage.setItem('cmPickMkt',pickMkt);}catch(_){} renderPick(); return; }
   const cf=t.closest('[data-calf]'); if(cf){ calMine=cf.dataset.calf==='mine'; renderCal(); return; }
   const tb=t.closest('[data-tab]'); if(tb){ setTab(tb.dataset.tab); return; }

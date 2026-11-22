@@ -29,7 +29,13 @@ const { fetchMany } = require('../lib/yahoo');
   console.log('성공', ok, '/ 실패', Object.keys(errors).length, errors);
   if (ok < 20) { console.error('데이터가 너무 적어 배포하지 않습니다'); process.exit(1); }
   // 용량 줄이기: 유효숫자 6자리
-  for (const v of Object.values(items)) v.c = v.c.map(x => +x.toPrecision(6));
+  // 거래량은 종목만 최근 60일 (단타·스윙 후보 계산용)
+  const stockSet = new Set([...sb.matchAll(/\['([^']+)','[^']+'\]/g)].map(m => m[1]).concat(extra.map(x => x.sym)));
+  for (const [s, v] of Object.entries(items)) {
+    v.c = v.c.map(x => +x.toPrecision(6));
+    if (stockSet.has(s) && v.vol && v.vol.some(Boolean)) v.v = v.vol.slice(-60); 
+    delete v.vol;
+  }
   fs.writeFileSync(out, JSON.stringify({ source: 'yahoo', fetchedAt: Date.now(), items, errors, extra }));
   console.log('저장:', out, (fs.statSync(out).size / 1024).toFixed(0) + 'KB');
 })();
