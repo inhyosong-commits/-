@@ -121,6 +121,27 @@ h2 small{font-weight:400;color:var(--text-muted);font-size:12px}
 .pos52 i{position:absolute;top:-2px;width:3px;height:7px;border-radius:1px;background:var(--text-secondary)}
 
 /* modal */
+#modal{z-index:30}
+.secgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.sc{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:10px 12px;cursor:pointer;min-height:92px}
+.sc:hover{border-color:var(--text-muted)}
+.sc .n{font-weight:700;font-size:14px;display:flex;justify-content:space-between;align-items:flex-start;gap:6px}
+.sc .n span:first-child{min-width:0}
+.sc .v{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;margin:2px 0}
+.sc .w{font-size:11.5px;color:var(--text-muted);line-height:1.35}
+.wind{font-size:11px;padding:1px 7px;border-radius:999px;white-space:nowrap;font-weight:600;background:var(--surface-2);color:var(--text-secondary)}
+.wind.tail{color:var(--st-good)} .wind.head{color:var(--st-serious)}
+.macro{background:var(--surface-2);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13.5px;line-height:1.6}
+.macro .drv{display:flex;justify-content:space-between;gap:8px;border-top:1px solid var(--border);padding:6px 0;font-size:13px}
+.macro .drv:first-of-type{border-top:0}
+.srow{display:grid;grid-template-columns:minmax(0,1fr) 72px auto 40px;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);cursor:pointer}
+.srow .nm2{font-weight:600;font-size:14px}
+.srow .nm2 small{display:block;font-weight:400;color:var(--text-muted);font-size:11.5px}
+.srow svg{width:72px;height:28px}
+.srow .pr{text-align:right;font-variant-numeric:tabular-nums;font-size:13.5px;white-space:nowrap}
+.srow .pr small{display:block;font-size:12px}
+.srow .st{min-width:40px;min-height:40px;padding:0;font-size:18px;background:none;border:0;color:var(--text-muted)}
+.srow .st.on{color:var(--st-warn)}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:20;padding:20px}
 .modal.open{display:flex}
 .panel{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;width:min(960px,100%);max-height:92vh;overflow:auto;padding:16px 18px}
@@ -247,6 +268,9 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
 
 
 
+  <section id="s-sec"><h2>섹터 <small>눌러서 관련 종목과 거시 순풍·역풍 보기 · 숫자는 대표 종목 1주 평균 · 순풍/역풍은 최근 1개월 거시 환경</small></h2>
+  <div class="secgrid" id="sectors"></div></section>
+
   <section id="s-all"><h2>전체 지표 <small>눌러서 펼치기 · 오른쪽은 오늘 가장 크게 움직인 것</small></h2>
   <div id="groups"></div></section>
 </main>
@@ -265,6 +289,16 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
     <div class="stats" id="mStats"></div>
     <div id="mIns"></div>
     <div id="mTbl"></div>
+  </div>
+</div>
+
+<div class="modal" id="secm">
+  <div class="panel" role="dialog" aria-modal="true">
+    <div class="hd"><h3 id="sTitle"></h3><span class="spacer"></span><button id="sClose">닫기 ✕</button></div>
+    <div class="note" id="sDesc"></div>
+    <div id="sMacro"></div>
+    <h2>관련 종목 <small>눌러서 차트 · ☆로 관심종목 추가</small></h2>
+    <div id="sList"></div>
   </div>
 </div>
 
@@ -355,6 +389,49 @@ const META = {};
 INSTR.forEach(([g,s,n,u,k,why])=>META[s]={group:g,sym:s,name:n,unit:u,kind:k||'pct',why});
 DERIVED.forEach(([s,n,u,k,f,parts,why,g])=>META[s]={group:g,sym:s,name:n,unit:u,kind:k,f,parts,why,derived:true});
 
+/* 섹터: 거시 동인(drivers: [지표, +1이면 오를 때 순풍 / -1이면 오를 때 역풍, 설명]) + 대표 종목 */
+const SECTORS = [
+  {id:'semi', name:'반도체', desc:'AI·데이터센터 투자와 메모리 가격 사이클', demo:-.06,
+   drivers:[['^IXIC',1,'나스닥'],['KRW=X',1,'원화 약세(수출 실적↑)'],['^TNX',-1,'미 10년물 금리']],
+   stocks:[['SOXX','미국 반도체 ETF'],['005930.KS','삼성전자'],['000660.KS','SK하이닉스'],['042700.KS','한미반도체'],['NVDA','엔비디아'],['TSM','TSMC'],['MU','마이크론'],['ASML','ASML']]},
+  {id:'power', name:'전력·인프라', desc:'AI 전력 수요와 전력망 투자 (구리 많이 씀)', demo:-.02,
+   drivers:[['HG=F',1,'구리(전력망 수요 지표)'],['^IXIC',1,'나스닥(AI 투자)'],['^TNX',-1,'미 10년물 금리']],
+   stocks:[['267260.KS','HD현대일렉트릭'],['010120.KS','LS ELECTRIC'],['298040.KS','효성중공업'],['GEV','GE버노바'],['ETN','이튼']]},
+  {id:'battery', name:'2차전지·전기차', desc:'전기차 판매, 리튬 가격, 미국 정책', demo:-.05,
+   drivers:[['^IXIC',1,'나스닥(성장주 심리)'],['CL=F',1,'유가(높을수록 전기차 매력↑)'],['^TNX',-1,'미 10년물 금리']],
+   stocks:[['LIT','리튬·배터리 ETF'],['373220.KS','LG에너지솔루션'],['006400.KS','삼성SDI'],['247540.KQ','에코프로비엠'],['003670.KS','포스코퓨처엠'],['TSLA','테슬라'],['ALB','앨버말(리튬)']]},
+  {id:'steel', name:'철강·비철금속', desc:'중국 건설·제조 경기와 원자재 가격', demo:-.09,
+   drivers:[['HG=F',1,'구리'],['000001.SS',1,'상하이종합(중국 경기)'],['AUDUSD=X',1,'호주달러(중국 수요)']],
+   stocks:[['SLX','철강 ETF'],['005490.KS','POSCO홀딩스'],['004020.KS','현대제철'],['010130.KS','고려아연'],['NUE','뉴코어'],['FCX','프리포트(구리)'],['MT','아르셀로미탈']]},
+  {id:'energy', name:'정유·에너지', desc:'유가와 정제마진', demo:-.05,
+   drivers:[['CL=F',1,'WTI 유가'],['CRACK',1,'휘발유 정제마진']],
+   stocks:[['XLE','미국 에너지 ETF'],['096770.KS','SK이노베이션'],['010950.KS','S-Oil'],['XOM','엑슨모빌'],['CVX','셰브론']]},
+  {id:'ship', name:'조선·해운', desc:'LNG선·해양플랜트 발주와 운임', demo:-.03,
+   drivers:[['NG=F',1,'천연가스(LNG선 수요)'],['CL=F',1,'유가(해양 투자)'],['KRW=X',1,'원화 약세(수출 실적↑)']],
+   stocks:[['009540.KS','HD한국조선해양'],['329180.KS','HD현대중공업'],['042660.KS','한화오션'],['010140.KS','삼성중공업'],['011200.KS','HMM']]},
+  {id:'defense', name:'방산', desc:'지정학 긴장과 각국 국방비', demo:.04,
+   drivers:[['GC=F',1,'금(지정학 불안)'],['^VIX',1,'VIX(긴장 고조)']],
+   stocks:[['ITA','미국 방산 ETF'],['012450.KS','한화에어로스페이스'],['064350.KS','현대로템'],['079550.KS','LIG넥스원'],['LMT','록히드마틴'],['RHM.DE','라인메탈']]},
+  {id:'auto', name:'자동차', desc:'미국 소비, 환율, 관세', demo:-.03,
+   drivers:[['KRW=X',1,'원화 약세(수출 실적↑)'],['^GSPC',1,'미국 경기'],['^TNX',-1,'금리(할부금리)']],
+   stocks:[['005380.KS','현대차'],['000270.KS','기아'],['012330.KS','현대모비스'],['TM','도요타'],['GM','GM']]},
+  {id:'fin', name:'금융·은행', desc:'금리 수준과 장단기 금리차(예대마진)', demo:-.02,
+   drivers:[['CURVE2',1,'장단기 금리차'],['^TNX',1,'미 10년물 금리'],['^VIX',-1,'시장 불안']],
+   stocks:[['XLF','미국 금융 ETF'],['105560.KS','KB금융'],['055550.KS','신한지주'],['086790.KS','하나금융지주'],['JPM','JP모건']]},
+  {id:'bio', name:'바이오·헬스케어', desc:'금리(미래가치 할인)와 신약 이슈', demo:.01,
+   drivers:[['^TNX',-1,'미 10년물 금리'],['^IXIC',1,'나스닥(성장주 심리)']],
+   stocks:[['XLV','미국 헬스케어 ETF'],['207940.KS','삼성바이오로직스'],['068270.KS','셀트리온'],['LLY','일라이릴리'],['NVO','노보노디스크']]},
+  {id:'internet', name:'인터넷·소프트웨어', desc:'금리와 성장주 심리, AI 경쟁', demo:-.04,
+   drivers:[['^IXIC',1,'나스닥'],['^TNX',-1,'미 10년물 금리']],
+   stocks:[['035420.KS','NAVER'],['035720.KS','카카오'],['MSFT','마이크로소프트'],['GOOGL','알파벳'],['META','메타']]},
+];
+const STOCK_SECTOR = {};
+SECTORS.forEach(sec=>sec.stocks.forEach(([sym,name])=>{
+  STOCK_SECTOR[sym]=sec.id;
+  const kr=/\.(KS|KQ)$/.test(sym), eu=/\.DE$/.test(sym);
+  META[sym]={group:'stock',sym,name,unit:kr?'₩':eu?'€':'$',kind:'pct',why:sec.name+' · '+(kr?'한국':eu?'독일':'미국'),stock:true};
+}));
+
 /* =========================================================
    2. 데이터 불러오기 (로컬 서버 → 실패 시 데모 데이터)
    ========================================================= */
@@ -370,7 +447,7 @@ async function loadStatic(){
 }
 async function loadLive(){
   if(SRC!=='api'){ try{ const j=await loadStatic(); SRC='static'; return j; }catch(e){ if(SRC==='static') throw e; } }
-  const syms = INSTR.map(x=>x[1]).join(',');
+  const syms = [...INSTR.map(x=>x[1]), ...Object.keys(STOCK_SECTOR)].join(',');
   const ctl = new AbortController(); const to = setTimeout(()=>ctl.abort(), 25000);
   try{
     const r = await fetch('/api/chart?range=1y&symbols='+encodeURIComponent(syms), {signal:ctl.signal, cache:'no-store'});
@@ -412,6 +489,13 @@ function makeDemo(){
     const sh = shock[s]||0;
     if(sh){ for(let i=0;i<5;i++){ const f=(i+1)/5, k=N-5+i; c[k] = isAbs? c[k-0]+sh*f : c[k]*Math.pow(1+sh,f); } }
     items[s]={t:t.slice(), c, price:c[N-1], marketTime:t[N-1]};
+  }
+  for(const sec of SECTORS) for(const [sym] of sec.stocks){
+    const kr=/\.(KS|KQ)$/.test(sym), base = kr? Math.round((20000+rnd()*400000)/100)*100 : Math.round(50+rnd()*500), sd=0.022;
+    let p=[0]; for(let i=1;i<N;i++) p.push(p[i-1]+gauss()*sd+sd*0.03);
+    const end=p[N-1]; const c=p.map(x=>base*Math.exp(x-end));
+    const sh=sec.demo*(0.6+rnd()*0.8); for(let i=0;i<5;i++){ const k=N-5+i; c[k]*=Math.pow(1+sh,(i+1)/5); }
+    items[sym]={t:t.slice(), c, price:c[N-1], marketTime:t[N-1]};
   }
   return {source:'demo', fetchedAt:Date.now(), items, errors:{}};
 }
@@ -793,20 +877,56 @@ const DEFAULT_PREFS = { watch:['HG=F','CL=F','GC=F','KRW=X','^KS11','^TNX','CUGO
 let PREFS = loadPrefs();
 function loadPrefs(){ try{ const p=JSON.parse(localStorage.getItem('cmPrefs')); if(p&&Array.isArray(p.watch)) return Object.assign({},DEFAULT_PREFS,p,{watch:p.watch.filter(s=>META[s])}); }catch(_){} return JSON.parse(JSON.stringify(DEFAULT_PREFS)); }
 function savePrefs(){ try{ localStorage.setItem('cmPrefs', JSON.stringify(PREFS)); }catch(_){} }
-const SECTIONS = [['s-world','오늘의 세계'],['s-top','눈에 띄는 신호'],['s-watch','내 관심종목'],...GROUPS.map(([g,l])=>['g-'+g,l])];
+const SECTIONS = [['s-world','오늘의 세계'],['s-top','눈에 띄는 신호'],['s-watch','내 관심종목'],['s-sec','섹터'],...GROUPS.map(([g,l])=>['g-'+g,l])];
 const isHidden = id=>PREFS.hidden.includes(id);
 
 function renderEdit(){
   $('eWatch').innerHTML = PREFS.watch.length ? PREFS.watch.map((s,i)=>`<div class="erow"><span class="nmx">${nm(s)}</span>
     <button data-mv="${i}" data-d="-1" ${i===0?'disabled':''} aria-label="위로">↑</button><button data-mv="${i}" data-d="1" ${i===PREFS.watch.length-1?'disabled':''} aria-label="아래로">↓</button><button data-rm="${s}" aria-label="빼기">✕</button></div>`).join('') : '<div class="empty">관심종목이 없습니다. 아래에서 추가하세요.</div>';
-  $('eAll').innerHTML = GROUPS.map(([g,l])=>`<div class="egrp"><div class="gl">${l}</div>${Object.values(META).filter(m=>m.group===g).map(m=>`<span class="tog ${PREFS.watch.includes(m.sym)?'on':''}" data-tg="${m.sym}">${m.name}</span>`).join('')}</div>`).join('');
+  $('eAll').innerHTML = GROUPS.map(([g,l])=>`<div class="egrp"><div class="gl">${l}</div>${Object.values(META).filter(m=>m.group===g).map(m=>`<span class="tog ${PREFS.watch.includes(m.sym)?'on':''}" data-tg="${m.sym}">${m.name}</span>`).join('')}</div>`).join('')
+    + SECTORS.map(sec=>`<div class="egrp"><div class="gl">섹터 · ${sec.name}</div>${sec.stocks.map(([sym,name])=>`<span class="tog ${PREFS.watch.includes(sym)?'on':''}" data-tg="${sym}">${name}</span>`).join('')}</div>`).join('');
   $('eSecs').innerHTML = SECTIONS.map(([id,l])=>`<label class="erow"><input type="checkbox" data-sec="${id}" ${isHidden(id)?'':'checked'}> ${l}</label>`).join('');
   $('eMine').checked = !!PREFS.mine;
 }
 function applyPrefs(){ savePrefs(); renderAll(); if($('edit').classList.contains('open')) renderEdit(); }
+function sectorStats(sec){
+  const ms = sec.stocks.map(([s])=>METRICS[s]).filter(Boolean);
+  const avg = k=>{ const v=ms.map(m=>m[k]).filter(x=>x!=null); return v.length? mean(v):null; };
+  const drv = sec.drivers.filter(([s])=>METRICS[s]).map(([s,sign,label])=>{ const m=METRICS[s]; const eff = (m.z21||0)*sign; return {s,sign,label,m,eff}; });
+  const score = drv.length? mean(drv.map(d=>d.eff)) : 0;
+  return { n:ms.length, d1:avg('d1'), d5:avg('d5'), m1:avg('m1'), drv, score, wind: score>=0.5?'tail':score<=-0.5?'head':'flat' };
+}
+const WIND = {tail:'순풍', head:'역풍', flat:'중립'};
+function renderSectors(){
+  $('sectors').innerHTML = SECTORS.map(sec=>{
+    const st=sectorStats(sec);
+    return `<div class="sc" data-sec-open="${sec.id}" tabindex="0"><div class="n"><span>${sec.name}</span><span class="wind ${st.wind}">${WIND[st.wind]}</span></div>
+      <div class="v ${dirCls(st.d5)}">${st.d5==null?'–':arrow(st.d5)+' '+pct(st.d5)}</div><div class="w">${sec.desc}</div></div>`;
+  }).join('');
+}
+let curSec=null;
+function openSector(id){ curSec=id; drawSector(); $('secm').classList.add('open'); }
+function drawSector(){
+  const sec=SECTORS.find(x=>x.id===curSec); if(!sec) return; const st=sectorStats(sec);
+  $('sTitle').textContent=sec.name; $('sDesc').textContent=sec.desc;
+  const tails=st.drv.filter(d=>d.eff>=0.5), heads=st.drv.filter(d=>d.eff<=-0.5);
+  const verdict = st.wind==='tail' ? `최근 1개월 거시 환경은 <b>${sec.name}에 우호적</b>입니다.` : st.wind==='head' ? `최근 1개월 거시 환경은 <b>${sec.name}에 부담</b>입니다.` : `최근 1개월 거시 환경은 <b>뚜렷한 방향이 없습니다</b>.`;
+  const desc = d=>{ const up=(d.m.m1||0)>0; return `${d.label} ${up?'상승':'하락'}`; };
+  const why = [tails.length?`순풍: ${tails.map(desc).join(', ')}`:'', heads.length?`역풍: ${heads.map(desc).join(', ')}`:''].filter(Boolean).join(' / ');
+  $('sMacro').innerHTML = `<div class="macro">${verdict} ${why?why+'.':''}<br><span class="note">대표 종목 평균: 1일 ${pct(st.d1)} · 1주 ${pct(st.d5)} · 1개월 ${pct(st.m1)}</span>
+    <div style="margin-top:8px">${st.drv.map(d=>`<div class="drv" data-sym="${d.s}"><span>${d.label} <span class="note">(${d.sign>0?'오르면 좋음':'내리면 좋음'})</span></span><span class="${dirCls(d.m.m1)}">1개월 ${fmtChg(d.s,d.m.m1)} · <b>${d.eff>=0.5?'순풍':d.eff<=-0.5?'역풍':'중립'}</b></span></div>`).join('')}</div></div>`;
+  $('sList').innerHTML = sec.stocks.map(([s])=>{
+    const m=METRICS[s], meta=META[s], on=PREFS.watch.includes(s);
+    if(!m) return `<div class="srow"><div class="nm2">${meta.name}<small>${meta.why}</small></div><div></div><div class="pr note">데이터 없음</div><div></div></div>`;
+    return `<div class="srow" data-sym="${s}"><div class="nm2">${meta.name}<small>${meta.why}</small></div>${spark(DATA[s].c)}
+      <div class="pr">${fmtPrice(s,m.last)}<small class="${dirCls(m.d1)}">${arrow(m.d1)} ${fmtChg(s,m.d1)}</small></div>
+      <button class="st ${on?'on':''}" data-star="${s}" aria-label="관심종목">${on?'★':'☆'}</button></div>`;
+  }).join('');
+}
 function renderAll(){
   if(!Object.keys(METRICS).length) return;
-  renderWatch(); renderRegime(); renderInsights(); renderGroups();
+  renderWatch(); renderRegime(); renderInsights(); renderSectors(); renderGroups();
+  if(curSec&&$('secm').classList.contains('open')) drawSector();
   for(const [id] of SECTIONS){ const el=$(id); if(el) el.style.display=isHidden(id)?'none':''; }
 }
 function renderWatch(){
@@ -827,7 +947,7 @@ function renderGroups(){
   }).join('');
   const alerts = INSIGHTS.filter(x=>x.level!=='info').length;
   const short = {growth:'경기',infl:'인플레',money:'금리·달러',mood:'심리',stocks:'주가',softs:'농산물'};
-  $('secnav').innerHTML = `<a href="#s-world">요약</a><a href="#s-top">신호${alerts?`<b>${alerts}</b>`:''}</a><a href="#s-watch">내 종목</a><a href="#s-all">전체 지표</a>`;
+  $('secnav').innerHTML = `<a href="#s-world">요약</a><a href="#s-top">신호${alerts?`<b>${alerts}</b>`:''}</a><a href="#s-watch">내 종목</a><a href="#s-sec">섹터</a><a href="#s-all">전체 지표</a>`;
 }
 function tile(s, flagged){
       const m=METRICS[s], meta=META[s];
@@ -925,7 +1045,7 @@ function renderDelta(RG){
   if(gone.length) parts.push(`사라진 신호: ${gone.map(x=>x.title.split(' → ')[0].replace('복합 신호: ','')).join(', ')}`);
   const mv=RG.map((r,i)=>({k:r.k,d:(r.v??0)-(PREV.rg[i].v??0)})).filter(x=>Math.abs(x.d)>=8);
   if(mv.length) parts.push('렌즈 변화: '+mv.map(x=>`${x.k} <b class="${dirCls(x.d)}">${x.d>0?'+':''}${x.d}</b>`).join(', '));
-  const big=Object.values(METRICS).filter(m=>m.z1!=null&&!META[m.sym].derived).sort((a,b)=>Math.abs(b.z1)-Math.abs(a.z1)).slice(0,3);
+  const big=Object.values(METRICS).filter(m=>m.z1!=null&&!META[m.sym].derived&&!META[m.sym].stock).sort((a,b)=>Math.abs(b.z1)-Math.abs(a.z1)).slice(0,3);
   parts.push('가장 크게 움직인 것: '+big.map(m=>`<span data-sym="${m.sym}" style="cursor:pointer">${nm(m.sym)} <b class="${dirCls(m.d1)}">${fmtChg(m.sym,m.d1)}</b></span>`).join(', '));
   $('delta').innerHTML = `<b>어제 대비</b> · ` + (parts.length>1||fresh.length||gone.length||mv.length ? parts.join(' · ') : '큰 변화 없음 · '+parts.join(''));
 }
@@ -956,16 +1076,20 @@ document.addEventListener('click', e=>{
   const rm=t.closest('[data-rm]'); if(rm){ PREFS.watch=PREFS.watch.filter(s=>s!==rm.dataset.rm); applyPrefs(); return; }
   const tg=t.closest('[data-tg]'); if(tg){ const s=tg.dataset.tg; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); return; }
   if(t===$('edit')){ $('edit').classList.remove('open'); return; }
+  const star=t.closest('[data-star]'); if(star){ const s=star.dataset.star; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); return; }
+  const so=t.closest('[data-sec-open]'); if(so){ openSector(so.dataset.secOpen); return; }
+  if(t===$('secm')){ $('secm').classList.remove('open'); return; }
   const q=t.closest('[data-sym]'); if(q){ openModal(q.dataset.sym); return; }
   if(e.target.id==='insMore'){ insAll=!insAll; renderInsights(); return; }
   const f=e.target.closest('[data-f]'); if(f){ insFilter=f.dataset.f; renderInsights(); return; }
   const r=e.target.closest('[data-r]'); if(r){ curRange=+r.dataset.r; drawModal(); return; }
   if(e.target===$('modal')) closeModal();
 });
-document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeModal(); $('edit').classList.remove('open'); } if(e.key==='Enter'&&e.target.dataset&&e.target.dataset.sym) openModal(e.target.dataset.sym); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ if($('modal').classList.contains('open')) closeModal(); else { $('edit').classList.remove('open'); $('secm').classList.remove('open'); } } if(e.key==='Enter'&&e.target.dataset&&e.target.dataset.sym) openModal(e.target.dataset.sym); });
 $('mClose').onclick=closeModal;
 $('mStar').onclick=()=>{ const s=curSym; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); drawModal(); };
 $('editBtn').onclick=()=>{ renderEdit(); $('edit').classList.add('open'); };
+$('sClose').onclick=()=>$('secm').classList.remove('open');
 $('eClose').onclick=()=>$('edit').classList.remove('open');
 $('eReset').onclick=()=>{ PREFS=JSON.parse(JSON.stringify(DEFAULT_PREFS)); applyPrefs(); };
 $('eMine').onchange=e=>{ PREFS.mine=e.target.checked; applyPrefs(); };
