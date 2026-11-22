@@ -36,15 +36,15 @@ nav.sec{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:
 nav.sec::-webkit-scrollbar{display:none}
 .tabs{display:flex;gap:4px;margin:0 0 8px;background:var(--surface-2);border-radius:10px;padding:3px}
 .tabs button{flex:1;min-height:36px;border:0;border-radius:8px;background:none;color:var(--text-secondary);font-size:14px;font-weight:600;cursor:pointer}
-.tabs button.on{background:var(--surface);color:var(--text-primary);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.tabs button.on{background:var(--surface-1);color:var(--text-primary);box-shadow:0 1px 3px rgba(0,0,0,.15)}
 body.pick nav.sec, body.pick #tab-mkt, body.cal nav.sec, body.cal #tab-mkt{display:none} body:not(.pick) #tab-pick{display:none} body:not(.cal) #tab-cal{display:none}
 .cday{margin:14px 0 4px;font-size:13px;font-weight:700;color:var(--text-secondary)} .cday b{color:var(--st-warn);margin-left:6px}
-.crow{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin:6px 0}
+.crow{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;padding:10px 12px;background:var(--surface-1);border:1px solid var(--border);border-radius:12px;margin:6px 0}
 .crow .ct{font-weight:600;font-size:14.5px} .crow .cw{font-size:12.5px;color:var(--text-secondary);margin-top:3px;line-height:1.45}
 .ctag{font-size:11px;font-weight:700;padding:3px 7px;border-radius:6px;white-space:nowrap;background:var(--surface-2);color:var(--text-secondary)} .ctag.e{color:#e08a00} .ctag.m{color:#3b82f6} .ctag.t{color:#a855f7}
 .tl{list-style:none;margin:0;padding:0} .tl li{padding:8px 0;border-top:1px solid var(--border);font-size:13px;line-height:1.45} .tl li a{color:var(--text-primary);text-decoration:none} .tl li span{display:block;color:var(--text-muted);font-size:12px}
 .crow.mine{border-color:var(--st-warn)}
-.pbox{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin:10px 0}
+.pbox{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:14px;margin:10px 0}
 .pbox h3{margin:0 0 4px;font-size:16px} .pbox .pd{color:var(--text-secondary);font-size:13px;margin:0 0 8px;line-height:1.5}
 .prow{display:grid;grid-template-columns:minmax(0,1fr) auto 40px;gap:8px;align-items:center;padding:10px 2px;border-top:1px solid var(--border);cursor:pointer}
 .prow .pn{font-weight:600;font-size:14.5px} .prow .pn small{font-weight:400;color:var(--text-muted);font-size:12px;margin-left:4px}
@@ -53,13 +53,16 @@ body.pick nav.sec, body.pick #tab-mkt, body.cal nav.sec, body.cal #tab-mkt{displ
 .prow .st{min-width:40px;min-height:40px;padding:0;font-size:18px;background:none;border:0;color:var(--text-muted)} .prow .st.on{color:var(--st-warn)}
 .tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:5px;margin-right:4px;background:var(--surface-2);color:var(--text-secondary)}
 .tag.g{color:var(--st-good)} .tag.b{color:var(--st-serious)}
-.acct{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin:0 0 10px}
+.mk{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 5px;border-radius:4px;margin-right:5px;vertical-align:1px;line-height:1.4}
+.mk.kr{background:#1e2f52;color:#8fb3ff} .mk.us{background:#4a3215;color:#ffc27a} .mk.ov{background:#35295a;color:#c6b0ff}
+:root[data-theme=light] .mk.kr{background:#e8f0ff;color:#2457c5} :root[data-theme=light] .mk.us{background:#fff1e0;color:#b85c00} :root[data-theme=light] .mk.ov{background:#efe8ff;color:#6b3fc2}
+.acct{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin:0 0 10px}
 .acct .top{display:flex;gap:14px;flex-wrap:wrap;align-items:baseline} .acct .big{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
 .acct .k{font-size:12px;color:var(--text-muted)} .acct .v{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
 .acct table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;font-variant-numeric:tabular-nums} .acct td{padding:6px 2px;border-top:1px solid var(--border)} .acct td:not(:first-child){text-align:right}
-.hold{margin:10px 0;padding:10px 12px;background:var(--surface-2);border-radius:10px;font-size:13px} .hold input{width:110px;min-height:36px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text-primary);font-size:15px}
+.hold{margin:10px 0;padding:10px 12px;background:var(--surface-2);border-radius:10px;font-size:13px} .hold input{width:110px;min-height:36px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary);font-size:15px}
 .hold label{display:inline-flex;gap:6px;align-items:center;margin:4px 10px 4px 0}
-#cfgBanner .bn{margin:10px 16px;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--st-warn);font-size:14px}
+#cfgBanner .bn{margin:10px 16px;padding:12px;border-radius:12px;background:var(--surface-1);border:1px solid var(--st-warn);font-size:14px}
 .srank{display:flex;flex-wrap:wrap;gap:6px}
 .disc{font-size:12.5px;color:var(--text-secondary);background:var(--surface-2);border-radius:10px;padding:10px 12px;line-height:1.5;margin:10px 0}
 nav.sec a{flex:none;font-size:13px;color:var(--text-secondary);text-decoration:none;padding:6px 12px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border)}
@@ -1062,7 +1065,7 @@ function drawSector(){
   $('sList').innerHTML = sec.stocks.map(([s])=>{
     const m=METRICS[s], meta=META[s], on=PREFS.watch.includes(s);
     if(!m) return `<div class="srow"><div class="nm2">${meta.name}<small>${meta.why}</small></div><div></div><div class="pr note">데이터 없음</div><div></div></div>`;
-    return `<div class="srow" data-sym="${s}"><div class="nm2">${meta.name}<small>${meta.why}</small></div>${spark(DATA[s].c)}
+    return `<div class="srow" data-sym="${s}"><div class="nm2">${mkBadge(s)}${meta.name}<small>${meta.why}</small></div>${spark(DATA[s].c)}
       <div class="pr">${fmtPrice(s,m.last)}<small class="${dirCls(m.d1)}">${arrow(m.d1)} ${fmtChg(s,m.d1)}</small></div>
       <button class="st ${on?'on':''}" data-star="${s}" aria-label="관심종목">${on?'★':'☆'}</button></div>`;
   }).join('');
@@ -1086,15 +1089,19 @@ function pickData(){
     rows.push({s,name,sec,st,m,env,trend,dd,tails,heads,score:st.score*1.0+trend*0.8+(m.z21||0)*0.15});
   }
   rows.sort((a,b)=>b.score-a.score);
+  if(pickMkt!=='all') rows.splice(0,rows.length,...rows.filter(r=>pickMkt==='kr'?mkOf(r.s)==='kr':mkOf(r.s)!=='kr'));
   return { secs, A:rows.filter(r=>r.env===1&&r.trend===1), B:rows.filter(r=>r.env===1&&r.trend<=0),
     C:rows.filter(r=>r.env===0&&r.trend===1), D:rows.filter(r=>r.env===-1&&r.trend===-1).sort((a,b)=>a.score-b.score) };
 }
+const mkOf = s=> /\.(KS|KQ)$/.test(s)? 'kr' : (META[s]&&META[s].unit==='$'&&!/\./.test(s)&&!/=/.test(s)&&!/\^/.test(s))? 'us' : 'ov';
+const mkBadge = s=> (META[s]&&META[s].stock)? `<span class="mk ${mkOf(s)}">${{kr:'국장',us:'미장',ov:'해외'}[mkOf(s)]}</span>` : '';
+let pickMkt = 'all'; try{ pickMkt = localStorage.getItem('cmPickMkt')||'all'; }catch(_){}
 function pickRow(r){
   const on=PREFS.watch.includes(r.s);
   const envT = r.env===1?`<span class="tag g">환경 순풍</span>`: r.env===-1?`<span class="tag b">환경 역풍</span>`:`<span class="tag">환경 중립</span>`;
   const trT = r.trend===1?`<span class="tag g">상승 흐름</span>`: r.trend===-1?`<span class="tag b">하락 흐름</span>`:`<span class="tag">방향 없음</span>`;
   const why = r.env===1&&r.tails.length? `${r.tails.slice(0,2).join(', ')} 흐름이 ${r.sec.name}에 유리` : r.env===-1&&r.heads.length? `${r.heads.slice(0,2).join(', ')} 흐름이 ${r.sec.name}에 부담` : `${r.sec.name} 업종`;
-  return `<div class="prow" data-sym="${r.s}"><div><div class="pn">${esc(r.name)}<small>${r.sec.name}</small></div>
+  return `<div class="prow" data-sym="${r.s}"><div><div class="pn">${mkBadge(r.s)}${esc(r.name)}<small>${r.sec.name}</small></div>
     <div class="pw">${envT}${trT}<span class="tag">고점 대비 ${r.dd.toFixed(0)}%</span>${earnTag(r.s)}${(()=>{ const f=flowSum(r.s,5), t=targetOf(r.s); let o=''; if(f&&Math.abs(f.frg)>=10) o+=`<span class="tag ${f.frg>0?'g':'b'}">외국인 5일 ${f.frg>0?'순매수':'순매도'}</span>`; if(t&&r.m) o+=`<span class="tag">목표가까지 ${pct((t.tp/r.m.last-1)*100,0)}</span>`; return o; })()}<br>${why}</div></div>
     <div class="pr ${dirCls(r.m.m1)}">1개월<br>${arrow(r.m.m1)} ${pct(r.m.m1)}</div>
     <button class="st ${on?'on':''}" data-star="${r.s}" aria-label="관심종목">${on?'★':'☆'}</button></div>`;
@@ -1125,7 +1132,8 @@ function renderPick(){
   const P=pickData();
   const srank = `<div class="pbox"><h3>① 지금 바람이 부는 업종</h3><p class="pd">금리·환율·원자재 등 최근 1개월 거시 흐름이 각 업종에 유리한지 불리한지로 줄 세웠어요. 눌러서 자세히 보기.</p>
     <div class="srank">${P.secs.map(({sec,st})=>`<span class="chip" data-sec-open="${sec.id}">${sec.name} <span class="wind ${st.wind}">${WIND[st.wind]}</span></span>`).join('')}</div></div>`;
-  el.innerHTML = srank
+  const nK=SECTORS.flatMap(x=>x.stocks).filter(([s])=>mkOf(s)==='kr').length;
+  el.innerHTML = `<div class="filters" style="margin-top:4px">${[['all','전체'],['kr','국장 (한국)'],['ov','해외장 (미국 등)']].map(([k,l])=>`<button data-pmk="${k}" class="${pickMkt===k?'on':''}">${l}</button>`).join('')}</div>` + srank
     + pickBox('② 먼저 살펴볼 후보','업종 환경이 순풍이고, 주가도 상승 흐름(50일 평균 위, 3개월 상승)인 종목. 바람과 흐름이 같은 방향이에요.', P.A, 8)
     + pickBox('③ 지켜볼 후보','업종 환경은 순풍인데 주가는 쉬거나 내려온 종목. 흐름이 돌아서는지 지켜볼 만해요.', P.B, 6)
     + pickBox('④ 주가만 강한 종목','업종 환경은 중립인데 주가는 오르는 종목. 회사 자체 이슈(실적, 수주 등)로 오르는 경우가 많아요.', P.C, 5)
@@ -1203,7 +1211,7 @@ function renderCal(){
   for(const x of items){
     const day=kstDay(x.t);
     if(day!==last){ last=day; const dt=new Date(day); html+=`<div class="cday">${dt.getUTCMonth()+1}월 ${dt.getUTCDate()}일 (${'일월화수목금토'[dt.getUTCDay()]})<b>${x.d===0?'오늘':'D-'+x.d}</b></div>`; }
-    html+=`<div class="crow ${x.mine?'mine':''}" ${x.sym?`data-sym="${x.sym}"`:''}><span class="ctag ${x.kind}">${x.tag}</span><div><div class="ct">${x.mine?'★ ':''}${esc(x.title)}</div><div class="cw">${esc(x.why)}</div></div></div>`;
+    html+=`<div class="crow ${x.mine?'mine':''}" ${x.sym?`data-sym="${x.sym}"`:''}><span class="ctag ${x.kind}">${x.tag}</span><div><div class="ct">${x.mine?'★ ':''}${x.sym?mkBadge(x.sym):''}${esc(x.title)}</div><div class="cw">${esc(x.why)}</div></div></div>`;
   }
   if(!EVENTS) html=`<p class="note">일정 데이터를 아직 못 받았어요. 몇 분 뒤 새로고침해 주세요.</p>`;
   else if(!items.length) html=`<p class="note">앞으로 60일 안에 잡힌 일정이 없어요.</p>`;
@@ -1245,7 +1253,7 @@ function renderAcct(){
     <div class="top"><span class="big">${won(val)}</span>
     <span><span class="k">오늘</span> <span class="v ${dirCls(today)}">${swon(today)} (${pct(today/(val-today)*100)})</span></span>
     ${cost?`<span><span class="k">총 손익</span> <span class="v ${dirCls(gain)}">${swon(gain)} (${pct(gain/cost*100)})</span></span>`:''}</div>
-    <table>${rows.map(r=>`<tr data-sym="${r.s}"><td>${nm(r.s)}</td><td class="${dirCls(r.today)}">${swon(r.today)}</td><td class="${r.cost?dirCls(r.val-r.cost):''}">${r.cost?pct((r.val/r.cost-1)*100):'–'}</td><td>${Math.round(r.val/val*100)}%</td></tr>`).join('')}</table>
+    <table>${rows.map(r=>`<tr data-sym="${r.s}"><td>${mkBadge(r.s)}${nm(r.s)}</td><td class="${dirCls(r.today)}">${swon(r.today)}</td><td class="${r.cost?dirCls(r.val-r.cost):''}">${r.cost?pct((r.val/r.cost-1)*100):'–'}</td><td>${Math.round(r.val/val*100)}%</td></tr>`).join('')}</table>
     <div class="note" style="margin-top:6px">오늘 · 수익률 · 비중 순. 해외 종목은 현재 환율로 환산해서 환율 변동 손익은 빠져 있어요.</div></div>`;
 }
 function holdForm(sym){
@@ -1297,7 +1305,7 @@ function tile(s, flagged){
       if(!m) return `<div class="q"><div class="nm">${meta.name}<small>${s}</small></div><div class="err">데이터 없음${ERRORS[s]?' ('+ERRORS[s]+')':''}</div></div>`;
       const zflag = m.z1!=null && Math.abs(m.z1)>=2 ? `<span class="z ${dirCls(m.z1)}" title="평소 변동폭의 ${Math.abs(m.z1).toFixed(1)}배">⚡</span>`:'';
       return `<div class="q ${flagged.has(s)?'flag':''}" data-sym="${s}" tabindex="0">
-        <div class="nm"><span>${meta.name}</span><small>${s.length<10&&!meta.derived?s:''}</small></div>
+        <div class="nm"><span>${mkBadge(s)}${meta.name}</span><small>${s.length<10&&!meta.derived?s:''}</small></div>
         ${meta.why?`<div class="why1">${meta.why}</div>`:''}
         ${zflag}
         <div class="px">${fmtPrice(s,m.last)}<small>${meta.unit}</small></div>
@@ -1544,6 +1552,7 @@ document.addEventListener('click', e=>{
   const og=t.closest('[data-open-g]'); if(og){ const d=document.querySelector(`details[data-g="${og.dataset.openG}"]`); if(d) d.open=true; }
   const cp=t.closest('[data-copy]'); if(cp){ const prompt = cp.dataset.copy==='pick' ? pickPrompt() : cp.dataset.copy==='cal' ? calPrompt() : $('secm').classList.contains('open') ? sectorPrompt(SECTORS.find(x=>x.id===curSec)) : askPrompt();
     navigator.clipboard.writeText(prompt).then(()=>{ cp.textContent='복사됨 ✓'; setTimeout(()=>cp.textContent='질문 복사',1500); }).catch(()=>{ cp.textContent='복사 실패'; }); return; }
+  const pm=t.closest('[data-pmk]'); if(pm){ pickMkt=pm.dataset.pmk; try{localStorage.setItem('cmPickMkt',pickMkt);}catch(_){} renderPick(); return; }
   const cf=t.closest('[data-calf]'); if(cf){ calMine=cf.dataset.calf==='mine'; renderCal(); return; }
   const tb=t.closest('[data-tab]'); if(tb){ setTab(tb.dataset.tab); return; }
   const star=t.closest('[data-star]'); if(star){ const s=star.dataset.star; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); return; }
