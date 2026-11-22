@@ -41,6 +41,8 @@ jobs:
       - name: 실적·거시 일정 받아오기
         run: node scripts/fetch-events.js public/events.json "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/events.json"
         continue-on-error: true
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
       - name: AI 종합 리포트 (Perplexity, 키가 있을 때만)
         run: node scripts/ai-report.js public/market.json public/news.json public/report.json "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/report.json"
         continue-on-error: true

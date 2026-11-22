@@ -41,7 +41,8 @@ body.pick nav.sec, body.pick #tab-mkt, body.cal nav.sec, body.cal #tab-mkt{displ
 .cday{margin:14px 0 4px;font-size:13px;font-weight:700;color:var(--text-secondary)} .cday b{color:var(--st-warn);margin-left:6px}
 .crow{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin:6px 0}
 .crow .ct{font-weight:600;font-size:14.5px} .crow .cw{font-size:12.5px;color:var(--text-secondary);margin-top:3px;line-height:1.45}
-.ctag{font-size:11px;font-weight:700;padding:3px 7px;border-radius:6px;white-space:nowrap;background:var(--surface-2);color:var(--text-secondary)} .ctag.e{color:#e08a00} .ctag.m{color:#3b82f6}
+.ctag{font-size:11px;font-weight:700;padding:3px 7px;border-radius:6px;white-space:nowrap;background:var(--surface-2);color:var(--text-secondary)} .ctag.e{color:#e08a00} .ctag.m{color:#3b82f6} .ctag.t{color:#a855f7}
+.tl{list-style:none;margin:0;padding:0} .tl li{padding:8px 0;border-top:1px solid var(--border);font-size:13px;line-height:1.45} .tl li a{color:var(--text-primary);text-decoration:none} .tl li span{display:block;color:var(--text-muted);font-size:12px}
 .crow.mine{border-color:var(--st-warn)}
 .pbox{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin:10px 0}
 .pbox h3{margin:0 0 4px;font-size:16px} .pbox .pd{color:var(--text-secondary);font-size:13px;margin:0 0 8px;line-height:1.5}
@@ -1133,6 +1134,11 @@ function calItems(){
     out.push({t:e.date,d,kind:'e',tag:'실적',sym:s,mine:PREFS.watch.includes(s),title:`${META[s].name} 실적 발표${e.estimate?' (예상일)':''}`,
       why:`${sec?sec.name+' 업종 · ':''}분기 성적표 발표${range}. 같은 업종 종목도 함께 움직일 수 있어요.`});
   }
+  for(const [s,list] of Object.entries(EVENTS.trials||{})) for(const tr of list){
+    const d=dday(tr.date); if(d<0||d>60||!META[s]) continue;
+    out.push({t:tr.date,d,kind:'t',tag:'임상',sym:s,mine:PREFS.watch.includes(s),title:`${META[s].name} 3상 임상 마무리 ${tr.month?'(이달 중) ':''}${tr.est?'예정':''}: ${tr.acronym||tr.title}`,
+      why:`${tr.cond||''} · 임상이 끝난 뒤 보통 몇 주~몇 달 안에 핵심 결과가 발표돼요. 성공이면 주가에 큰 호재, 실패면 큰 악재.`});
+  }
   return out.filter(x=>!calMine||x.mine||x.kind==='m').sort((a,b)=>a.t-b.t);
 }
 function calPrompt(){
@@ -1160,8 +1166,13 @@ function renderCal(){
   else if(!items.length) html=`<p class="note">앞으로 60일 안에 잡힌 일정이 없어요.</p>`;
   const bio = EVENTS&&EVENTS.bio ? Object.entries(EVENTS.bio).filter(([,v])=>v&&v.length) : [];
   const bioHtml = bio.length? `<div class="pbox"><h3>바이오 임상·허가 소식</h3><p class="pd">임상시험 결과나 허가 결정은 날짜가 미리 공개되지 않는 경우가 많아서, 최근 2주 뉴스로 보여 드려요.</p>${bio.map(([s,v])=>newsHtml(v,3,(META[s]?META[s].name:s))).join('')}</div>` : '';
+  const ym = t=>{ const d=new Date(t); return `${d.getFullYear()}.${d.getMonth()+1}`; };
+  const tri = EVENTS&&EVENTS.trials ? Object.entries(EVENTS.trials).filter(([s,v])=>v&&v.length&&META[s]&&(!calMine||PREFS.watch.includes(s))) : [];
+  const triHtml = tri.length? `<div class="pbox"><h3>3상 임상 마무리 예정 (앞으로 6개월)</h3><p class="pd">ClinicalTrials.gov(미국 정부 임상 등록 사이트)에 회사가 등록한 "주요 완료 예정일"이에요. 결과 발표일은 아니지만, 이 시점 전후로 결과가 나올 가능성이 높아요. 날짜는 회사 사정으로 자주 바뀝니다.</p>${tri.map(([s,v])=>`<div class="sec">${META[s].name}</div><ul class="tl">${v.slice(0,6).map(tr=>`<li><a href="https://clinicaltrials.gov/study/${esc(tr.nct)}" target="_blank" rel="noopener noreferrer"><b>${ym(tr.date)}${tr.est?' 예정':' 완료'}</b> · ${esc(tr.acronym?tr.acronym+' – ':'')}${esc(tr.title)}</a><span>${esc(tr.cond||'')}</span></li>`).join('')}</ul>`).join('')}</div>` : '';
+  const dar = EVENTS&&EVENTS.dart ? Object.entries(EVENTS.dart).filter(([s,v])=>v&&v.length&&META[s]&&(!calMine||PREFS.watch.includes(s))) : [];
+  const dartHtml = EVENTS&&EVENTS.dart ? `<div class="pbox"><h3>한국 종목 중요 공시 (최근 30일)</h3><p class="pd">금융감독원 DART에서 실적, 실적설명회(IR), 배당, 주총, 대형 계약, 임상·허가 관련 공시만 골랐어요. 누르면 공시 원문이 열려요.</p>${dar.length? dar.map(([s,v])=>`<div class="sec">${META[s].name}</div><ul class="tl">${v.map(x=>`<li><a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">${/기업설명회/.test(x.title)?'📅 ':''}${esc(x.title)}</a><span>${new Date(x.date).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'})} 공시</span></li>`).join('')}</ul>`).join('') : '<p class="note">최근 30일 동안 중요 공시가 없어요.</p>'}</div>` : '';
   el.innerHTML = `<p class="note" style="margin:6px 0 0">앞으로 60일 일정 · 실적 발표일은 회사가 확정하기 전엔 "예상일"로 표시돼요. 거시 일정은 미국 기준이고 발표 시각은 한국시간 밤~새벽이에요.</p>`
-    + html + bioHtml
+    + html + dartHtml + triHtml + bioHtml
     + `<div class="pbox"><h3>AI에게 일정 더 찾아보기</h3><p class="pd">임상 결과, 허가 결정, 신제품 발표, 배당·주총처럼 자동으로 못 가져오는 일정을 내 관심종목과 후보 종목 기준으로 찾아 줘요.</p><div class="askrow">${askButtons(calPrompt(),'cal')}</div></div>`;
 }
 function renderAll(){

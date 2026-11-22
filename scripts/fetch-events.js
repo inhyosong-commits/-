@@ -41,6 +41,64 @@ async function news(q, lang) {
     .sort((a, b) => (b.time || 0) - (a.time || 0)).slice(0, 5);
 }
 
+// ClinicalTrials.gov: 바이오 종목의 3상(및 2/3상) 임상 "주요 완료 예정일" (키 필요 없음)
+const TRIAL_SPONSORS = { 'LLY': 'Eli Lilly and Company', 'NVO': 'Novo Nordisk A/S', '068270.KS': 'Celltrion', '207940.KS': 'Samsung Bioepis' };
+async function trials() {
+  const out = {}, from = Date.now() - 30 * 864e5, to = Date.now() + 200 * 864e5;
+  for (const [sym, spons] of Object.entries(TRIAL_SPONSORS)) {
+    try {
+      const list = []; let token = '';
+      for (let page = 0; page < 4; page++) {
+        const u = `https://clinicaltrials.gov/api/v2/studies?query.spons=${encodeURIComponent(spons)}&filter.overallStatus=RECRUITING,ACTIVE_NOT_RECRUITING,ENROLLING_BY_INVITATION,NOT_YET_RECRUITING,COMPLETED&pageSize=200${token ? '&pageToken=' + token : ''}`;
+        const r = await fetch(u, { headers: { 'User-Agent': UA, Accept: 'application/json' } });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const j = await r.json();
+        for (const st of j.studies || []) {
+          const p = st.protocolSection || {}, id = p.identificationModule || {}, sm = p.statusModule || {}, dm = p.designModule || {};
+          const phases = dm.phases || [];
+          if (!phases.includes('PHASE3')) continue;
+          const pc = sm.primaryCompletionDateStruct || {};
+          const t = Date.parse(pc.date && pc.date.length === 7 ? pc.date + '-15' : pc.date);
+          if (!t || t < from || t > to) continue;
+          list.push({ nct: id.nctId, title: id.briefTitle, acronym: id.acronym || '', phase: phases.join('/').replace(/PHASE/g, ''), date: t, month: pc.date.length === 7, est: pc.type !== 'ACTUAL', status: sm.overallStatus, cond: ((p.conditionsModule || {}).conditions || []).slice(0, 2).join(', ') });
+        }
+        token = j.nextPageToken; if (!token) break;
+        await sleep(300);
+      }
+      out[sym] = list.sort((a, b) => a.date - b.date).slice(0, 15);
+    } catch (e) { console.log('임상', sym, '실패:', e.message); }
+  }
+  return out;
+}
+
+// DART(금융감독원 전자공시): 한국 종목의 최근 중요 공시 (GitHub Secrets 에 DART_API_KEY 가 있을 때만)
+const DART_KEY = process.env.DART_API_KEY;
+const DART_IMPORTANT = /실적|기업설명회|주주총회|배당|공급계약|임상|품목허가|자기주식|유상증자|무상증자|합병|분할|투자판단|신규시설|타법인|수주|특허/;
+async function dart(krSyms) {
+  if (!DART_KEY) { console.log('DART: 키 없음 → 건너뜀'); return null; }
+  const { execSync } = require('child_process');
+  const r = await fetch(`https://opendart.fss.or.kr/api/corpCode.xml?crtfc_key=${DART_KEY}`);
+  const buf = Buffer.from(await r.arrayBuffer());
+  if (buf.slice(0, 2).toString() !== 'PK') throw new Error('corpCode 받기 실패: ' + buf.slice(0, 200).toString());
+  fs.writeFileSync('/tmp/corp.zip', buf);
+  const xml = execSync('unzip -p /tmp/corp.zip', { maxBuffer: 200 * 1024 * 1024 }).toString('utf8');
+  const map = {};
+  for (const m of xml.matchAll(/<corp_code>(\d+)<\/corp_code>\s*<corp_name>[^<]*<\/corp_name>\s*(?:<corp_eng_name>[^<]*<\/corp_eng_name>\s*)?<stock_code>(\d{6})<\/stock_code>/g)) map[m[2]] = m[1];
+  const ymd = t => new Date(t + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, '');
+  const out = {};
+  for (const s of krSyms) {
+    const code = map[s.slice(0, 6)]; if (!code) continue;
+    try {
+      const j = await (await fetch(`https://opendart.fss.or.kr/api/list.json?crtfc_key=${DART_KEY}&corp_code=${code}&bgn_de=${ymd(Date.now() - 30 * 864e5)}&end_de=${ymd(Date.now())}&page_count=50`)).json();
+      if (j.status !== '000' && j.status !== '013') { console.log('DART', s, j.status, j.message); continue; }
+      out[s] = (j.list || []).filter(x => DART_IMPORTANT.test(x.report_nm)).slice(0, 6)
+        .map(x => ({ title: x.report_nm.trim().replace(/\s+/g, ' '), date: Date.parse(`${x.rcept_dt.slice(0, 4)}-${x.rcept_dt.slice(4, 6)}-${x.rcept_dt.slice(6)}T09:00:00+09:00`), link: `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${x.rcept_no}` }));
+    } catch (e) { console.log('DART', s, e.message); }
+    await sleep(200);
+  }
+  return out;
+}
+
 // Yahoo 쿠키 + crumb
 async function yahooSession() {
   const r1 = await fetch('https://fc.yahoo.com/', { headers: { 'User-Agent': UA }, redirect: 'manual' });
@@ -84,7 +142,7 @@ async function earnings(syms) {
   const out = process.argv[2] || 'public/events.json', prevUrl = process.argv[3];
   let prev = null;
   if (prevUrl) { try { const r = await fetch(prevUrl, { cache: 'no-store' }); if (r.ok) prev = await r.json(); } catch (_) {} }
-  if (prev && prev.fetchedAt && Date.now() - prev.fetchedAt < REFRESH_MS && process.env.FORCE_EVENTS !== '1') {
+  if (prev && prev.fetchedAt && Date.now() - prev.fetchedAt < REFRESH_MS && process.env.FORCE_EVENTS !== '1' && prev.trials && (!DART_KEY || prev.dart)) {
     prev.macro = MACRO; fs.writeFileSync(out, JSON.stringify(prev));
     console.log('일정: 최근 것 재사용 (', Math.round((Date.now() - prev.fetchedAt) / 60000), '분 전)'); return;
   }
@@ -98,6 +156,11 @@ async function earnings(syms) {
     try { res.bio[s] = await news(q, lang); } catch (e) { if (prev && prev.bio) res.bio[s] = prev.bio[s]; }
     await sleep(400);
   }
+  try { res.trials = await trials(); } catch (e) { console.log('임상 실패:', e.message); }
+  if (!res.trials || !Object.keys(res.trials).length) res.trials = (prev && prev.trials) || {};
+  try { res.dart = await dart(syms.filter(s => /\.(KS|KQ)$/.test(s))); } catch (e) { console.log('DART 실패:', e.message); }
+  if (!res.dart && prev && prev.dart) res.dart = prev.dart;
+  console.log('임상:', Object.entries(res.trials).map(([k, v]) => k + ' ' + v.length + '건').join(', '), '| DART:', res.dart ? Object.values(res.dart).flat().length + '건' : '없음');
   console.log('일정: 실적', Object.keys(res.earnings).length, '/', syms.length, '종목, 거시', MACRO.length, '건, 바이오 뉴스', Object.values(res.bio).flat().length, '건');
   fs.writeFileSync(out, JSON.stringify(res));
 })().catch(e => { console.error('일정 실패(배포는 계속):', e.message); });
