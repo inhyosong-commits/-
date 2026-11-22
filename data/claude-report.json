@@ -1,0 +1,35 @@
+{
+ "headline": "AI 쇼크로 전 세계 증시 급락",
+ "summary": "엔비디아를 중심으로 AI 관련주가 크게 무너지면서 미국, 한국, 일본 증시가 하루에 4~5%씩 빠졌습니다. 공포지수(VIX)는 36까지 치솟았고, 구리와 은 같은 원자재도 함께 떨어졌습니다. 정부는 증시안정펀드 가동을 준비하고 있습니다.",
+ "sections": [
+  {
+   "title": "무슨 일이 있었나",
+   "body": "나스닥이 하루 5.3%, 코스피가 5.2%, 닛케이가 5.1% 떨어졌습니다. 엔비디아는 하루 14%, 한 달 41% 하락했고 미국 반도체 ETF도 하루 10% 넘게 빠졌습니다. 삼성전자(-7%)와 SK하이닉스(-6%)도 같이 밀렸습니다. 공포지수(VIX)는 일주일 새 86% 올라 36 근처입니다."
+  },
+  {
+   "title": "왜 그랬나",
+   "body": "AI 칩 수요 증가세가 둔화된다는 분석이 나오면서, 그동안 많이 오른 AI 관련주에 대한 거품 우려가 한꺼번에 터진 것으로 보입니다. 해외 언론은 코로나 이후 최악의 한 주라고 표현했습니다. 주가가 빠지자 금과 은까지 팔아 현금을 마련하는 움직임도 나타난 것으로 보입니다."
+  },
+  {
+   "title": "우리에게 미치는 영향",
+   "body": "코스피는 5000선이 무너졌고, 반도체 비중이 큰 한국 증시가 특히 크게 흔들렸습니다. 원/달러 환율은 1338원으로 아직 크게 오르지는 않았지만, 외국인 매도가 이어지면 더 오를 수 있습니다. 구리 가격이 한 달 14% 빠진 것은 세계 경기가 식을 수 있다는 신호라 수출 기업에 부담입니다."
+  },
+  {
+   "title": "앞으로 확인할 것",
+   "body": "정부의 증시안정펀드가 실제로 가동되는지, 엔비디아 등 AI 기업 주가가 바닥을 다지는지, 그리고 환율이 1350원을 넘는지를 보시면 됩니다."
+  }
+ ],
+ "watch": [
+  "증시안정펀드 가동 여부",
+  "엔비디아·반도체주 반등 여부",
+  "원/달러 1350원 돌파 여부",
+  "미 연준 위원 발언"
+ ],
+ "citations": [
+  "https://www.wcax.com/2026/11/17/another-wipeout-hits-wall-street-nvidia-other-jittery-ai-stocks-swing-lower/",
+  "https://www.wealthprofessional.ca/investments/equity-markets/wall-street-absorbs-the-hit-as-nvidia-touches-a-52-week-low/394013",
+  "https://pro.thestreet.com/market-commentary/ai-stocks-drag-the-sp-500-back-toward-the-november-5th-lows"
+ ],
+ "generatedAt": 1795356670524,
+ "model": "claude"
+}
