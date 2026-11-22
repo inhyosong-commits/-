@@ -542,7 +542,7 @@ const ago = t => { if(!t) return ''; const m=Math.round((Date.now()-t)/60000); r
 const esc = x => String(x).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function newsHtml(list, n, label='관련 뉴스'){
   if(!list || !list.length) return '';
-  return `<div class="sec">${label}</div><ul class="news">${list.slice(0,n).map(x=>`<li>${x.en?'<em class="en">해외</em> ':''}<a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a><span>${esc(x.source||'')}${x.time?' · '+ago(x.time):''}</span></li>`).join('')}</ul>`;
+  return `<div class="sec">${label}</div><ul class="news">${list.slice(0,n).map(x=>`<li>${x.en?'<em class="en">해외</em> ':''}<a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer" ${x.ko?`title="${esc(x.title)}"`:''}>${esc(x.ko||x.title)}</a><span>${x.ko?'번역 · ':''}${esc(x.source||'')}${x.time?' · '+ago(x.time):''}</span></li>`).join('')}</ul>`;
 }
 let REPORT=null;
 async function loadReport(){
@@ -1197,21 +1197,50 @@ function earnScen(s){
           key:(key?`이 업종은 "${key}"를 특히 봐요.`:'')+(peers.length?` 결과는 ${peers.join('·')}에도 영향을 줄 수 있어요.`:'')};
 }
 const TRIAL_SCEN = {up:'주요 목표 달성(성공) → 허가·매출 기대 → 주가 급등 가능, 같은 약을 개발하는 경쟁사는 하락하기도',dn:'목표 미달(실패)이나 부작용 → 주가 급락. 회사 매출에서 이 약의 비중이 클수록 충격이 커요.',key:'결과 발표는 보통 임상이 끝나고 몇 주~몇 달 뒤, 학회나 보도자료로 나와요.'};
+function trialWhy(tr){
+  const parts=[];
+  if(tr.drugs&&tr.drugs.length) parts.push('시험약: '+tr.drugs.join(', '));
+  parts.push('대상: '+(tr.condKo||tr.cond||'–'));
+  if(tr.enroll) parts.push(`환자 ${Number(tr.enroll).toLocaleString('ko-KR')}명`);
+  return parts.join(' · ') + (tr.summaryKo||tr.summary ? '\n무엇을 시험하나: '+(tr.summaryKo||tr.summary) : (tr.titleKo? '\n'+tr.titleKo:''));
+}
+const SIMPLE = `전문 용어는 쓰지 말고 친구에게 설명하듯 쉽게, 짧게 답해줘. 매수·매도 추천은 하지 마.`;
+function trialAsk(s,tr){ return `${META[s].name}의 3상 임상이 곧 끝나. 최신 정보를 검색해서 알려줘.
+- 임상: ${tr.nct} ${tr.acronym?'('+tr.acronym+') ':''}${tr.title}
+- 시험약: ${(tr.drugs||[]).join(', ')||'정보 없음'} / 대상 질환: ${tr.cond}
+1) 이 약이 어떤 약인지 한 줄로
+2) 성공하면 어떤 의미인지: 이 병의 최초 치료제인지, 기존 약보다 뭐가 나은지, 시장이 얼마나 큰지
+3) 실패하면 어떤 의미인지
+4) 회사 주가와 경쟁사에 미칠 영향 (화살표로)
+5) 결과 발표 예상 시기와 시장 기대치
+${SIMPLE}`; }
+function earnAsk(s,e){ const d=new Date(e.date).toLocaleDateString('ko-KR',{month:'long',day:'numeric'}); return `${META[s].name}(${s}) 실적 발표가 ${d}${e.estimate?'(예상일)':''}에 있어. 최신 정보를 검색해서 알려줘.
+1) 이번 실적에서 시장이 가장 주목하는 것 1~2개
+2) 증권사 예상치(매출·이익)와 회사가 제시했던 전망
+3) 이번 발표에 특별한 의미가 있는지 (사상 최대, 첫 흑자, 신사업 첫 성과, 신제품 첫 반영 등)
+4) 좋으면/나쁘면 주가 영향과 같이 움직일 종목(한국·미국)을 화살표로
+${SIMPLE}`; }
+function macroAsk(m){ return `미국 "${m.title}" 발표가 ${m.date}에 있어. 최신 정보를 검색해서 알려줘.
+1) 이번에 시장이 예상하는 숫자와 그 의미
+2) 이번 발표가 특히 중요한 이유 (금리 결정에 어떤 영향인지 등)
+3) 예상보다 좋으면/나쁘면 → 미국 주식, 코스피, 원/달러 환율, 내 관심 업종에 미칠 영향 (화살표로)
+${SIMPLE}`; }
+const askLink = q=> `<a class="lk" style="font-size:12.5px" href="https://www.perplexity.ai/search?q=${encodeURIComponent(q)}" target="_blank" rel="noopener noreferrer">🔎 이게 왜 중요해? 자세히 물어보기</a>`;
 function calItems(){
   const now=Date.now(), out=[];
   if(!EVENTS) return out;
-  for(const m of EVENTS.macro||[]){ const t=Date.parse(m.date+'T12:00:00Z'); const d=dday(t); if(d>=0&&d<=60) out.push({t,d,kind:'m',mk:m.kind,tag:MK[m.kind]?MK[m.kind][0]:'거시',title:m.title,why:m.why}); }
+  for(const m of EVENTS.macro||[]){ const t=Date.parse(m.date+'T12:00:00Z'); const d=dday(t); if(d>=0&&d<=60) out.push({t,d,kind:'m',mk:m.kind,ask:macroAsk(m),tag:MK[m.kind]?MK[m.kind][0]:'거시',title:m.title,why:m.why}); }
   for(const [s,e] of Object.entries(EVENTS.earnings||{})){
     if(!META[s]) continue; const d=dday(e.date); if(d<0||d>60) continue;
     const sec=SECTORS.find(x=>x.id===STOCK_SECTOR[s]);
     const range = e.end&&dday(e.end)!==d ? ` ~ ${new Date(e.end).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'})} 사이` : '';
     out.push({t:e.date,d,kind:'e',tag:'실적',sym:s,mine:PREFS.watch.includes(s),title:`${META[s].name} 실적 발표${e.estimate?' (예상일)':''}`,
-      why:`${sec?sec.name+' 업종 · ':''}분기 성적표 발표${range}.`, scen:earnScen(s)});
+      why:`${sec?sec.name+' 업종 · ':''}분기 성적표 발표${range}.`, scen:earnScen(s), ask:earnAsk(s,e)});
   }
   for(const [s,list] of Object.entries(EVENTS.trials||{})) for(const tr of list){
     const d=dday(tr.date); if(d<0||d>60||!META[s]) continue;
-    out.push({t:tr.date,d,kind:'t',tag:'임상',sym:s,mine:PREFS.watch.includes(s),title:`${META[s].name} 3상 임상 마무리 ${tr.month?'(이달 중) ':''}${tr.est?'예정':''}: ${tr.acronym||tr.title}`,
-      why:`${tr.cond||''}`, scen:TRIAL_SCEN});
+    out.push({t:tr.date,d,kind:'t',tag:'임상',sym:s,mine:PREFS.watch.includes(s),title:`${META[s].name} 3상 임상 마무리 ${tr.month?'(이달 중) ':''}${tr.est?'예정':''}${tr.acronym?': '+tr.acronym:''}`,
+      why:trialWhy(tr), scen:TRIAL_SCEN, ask:trialAsk(s,tr)});
   }
   return out.filter(x=>!calMine||x.mine||x.kind==='m').sort((a,b)=>a.t-b.t);
 }
@@ -1234,7 +1263,7 @@ function renderCal(){
   for(const x of items){
     const day=kstDay(x.t);
     if(day!==last){ last=day; const dt=new Date(day); html+=`<div class="cday">${dt.getUTCMonth()+1}월 ${dt.getUTCDate()}일 (${'일월화수목금토'[dt.getUTCDay()]})<b>${x.d===0?'오늘':'D-'+x.d}</b></div>`; }
-    html+=`<div class="crow ${x.mine?'mine':''}" ${x.sym?`data-sym="${x.sym}"`:''}><span class="ctag ${x.kind}">${x.tag}</span><div><div class="ct">${x.mine?'★ ':''}${x.sym?mkBadge(x.sym):''}${esc(x.title)}</div><div class="cw">${esc(x.why)}</div>${(()=>{ const sc=x.scen||(x.mk&&MACRO_SCEN[x.mk]); return sc?`<div class="scn"><div><b class="up">▲ 좋으면</b> ${esc(sc.up)}</div><div><b class="down">▼ 나쁘면</b> ${esc(sc.dn)}</div>${sc.key?`<div class="note">💡 ${esc(sc.key)}</div>`:''}</div>`:''; })()}</div></div>`;
+    html+=`<div class="crow ${x.mine?'mine':''}" ${x.sym?`data-sym="${x.sym}"`:''}><span class="ctag ${x.kind}">${x.tag}</span><div><div class="ct">${x.mine?'★ ':''}${x.sym?mkBadge(x.sym):''}${esc(x.title)}</div><div class="cw">${esc(x.why).replace(/\n/g,'<br>')}</div>${(()=>{ const sc=x.scen||(x.mk&&MACRO_SCEN[x.mk]); return sc?`<div class="scn"><div><b class="up">▲ 좋으면</b> ${esc(sc.up)}</div><div><b class="down">▼ 나쁘면</b> ${esc(sc.dn)}</div>${sc.key?`<div class="note">💡 ${esc(sc.key)}</div>`:''}</div>`:''; })()}${x.ask?`<div style="margin-top:6px">${askLink(x.ask)}</div>`:''}</div></div>`;
   }
   if(!EVENTS) html=`<p class="note">일정 데이터를 아직 못 받았어요. 몇 분 뒤 새로고침해 주세요.</p>`;
   else if(!items.length) html=`<p class="note">앞으로 60일 안에 잡힌 일정이 없어요.</p>`;
@@ -1242,7 +1271,7 @@ function renderCal(){
   const bioHtml = bio.length? `<div class="pbox"><h3>바이오 임상·허가 소식</h3><p class="pd">임상시험 결과나 허가 결정은 날짜가 미리 공개되지 않는 경우가 많아서, 최근 2주 뉴스로 보여 드려요.</p>${bio.map(([s,v])=>newsHtml(v,3,(META[s]?META[s].name:s))).join('')}</div>` : '';
   const ym = t=>{ const d=new Date(t); return `${d.getFullYear()}.${d.getMonth()+1}`; };
   const tri = EVENTS&&EVENTS.trials ? Object.entries(EVENTS.trials).filter(([s,v])=>v&&v.length&&META[s]&&(!calMine||PREFS.watch.includes(s))) : [];
-  const triHtml = tri.length? `<div class="pbox"><h3>3상 임상 마무리 예정 (앞으로 6개월)</h3><p class="pd">ClinicalTrials.gov(미국 정부 임상 등록 사이트)에 회사가 등록한 "주요 완료 예정일"이에요. 결과 발표일은 아니지만, 이 시점 전후로 결과가 나올 가능성이 높아요. 날짜는 회사 사정으로 자주 바뀝니다.</p>${tri.map(([s,v])=>`<div class="sec">${META[s].name}</div><ul class="tl">${v.slice(0,6).map(tr=>`<li><a href="https://clinicaltrials.gov/study/${esc(tr.nct)}" target="_blank" rel="noopener noreferrer"><b>${ym(tr.date)}${tr.est?' 예정':' 완료'}</b> · ${esc(tr.acronym?tr.acronym+' – ':'')}${esc(tr.title)}</a><span>${esc(tr.cond||'')}</span></li>`).join('')}</ul>`).join('')}</div>` : '';
+  const triHtml = tri.length? `<div class="pbox"><h3>3상 임상 마무리 예정 (앞으로 6개월)</h3><p class="pd">ClinicalTrials.gov(미국 정부 임상 등록 사이트)에 회사가 등록한 "주요 완료 예정일"이에요. 결과 발표일은 아니지만, 이 시점 전후로 결과가 나올 가능성이 높아요. 날짜는 회사 사정으로 자주 바뀝니다.</p>${tri.map(([s,v])=>`<div class="sec">${META[s].name}</div><ul class="tl">${v.slice(0,6).map(tr=>`<li><a href="https://clinicaltrials.gov/study/${esc(tr.nct)}" target="_blank" rel="noopener noreferrer"><b>${ym(tr.date)}${tr.est?' 예정':' 완료'}</b> · ${esc(tr.acronym?tr.acronym+' – ':'')}${esc(tr.titleKo||tr.title)}</a><span>${esc(tr.condKo||tr.cond||'')}${tr.drugs&&tr.drugs.length?' · '+esc(tr.drugs.join(', ')):''}</span><span>${askLink(trialAsk(s,tr))}</span></li>`).join('')}</ul>`).join('')}</div>` : '';
   const dar = EVENTS&&EVENTS.dart ? Object.entries(EVENTS.dart).filter(([s,v])=>v&&v.length&&META[s]&&(!calMine||PREFS.watch.includes(s))) : [];
   const dartHtml = EVENTS&&EVENTS.dart ? `<div class="pbox"><h3>한국 종목 중요 공시 (최근 30일)</h3><p class="pd">금융감독원 DART에서 실적, 실적설명회(IR), 배당, 주총, 대형 계약, 임상·허가 관련 공시만 골랐어요. 누르면 공시 원문이 열려요.</p>${dar.length? dar.map(([s,v])=>`<div class="sec">${META[s].name}</div><ul class="tl">${v.map(x=>`<li><a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">${/기업설명회/.test(x.title)?'📅 ':''}${esc(x.title)}</a><span>${new Date(x.date).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'})} 공시</span></li>`).join('')}</ul>`).join('') : '<p class="note">최근 30일 동안 중요 공시가 없어요.</p>'}</div>` : '';
   el.innerHTML = `<p class="note" style="margin:6px 0 0">앞으로 60일 일정 · 실적 발표일은 회사가 확정하기 전엔 "예상일"로 표시돼요. 거시 일정은 미국 기준이고 발표 시각은 한국시간 밤~새벽이에요.</p>`
@@ -1567,6 +1596,7 @@ async function refresh(){
 
 document.addEventListener('click', e=>{
   const t=e.target;
+  if(t.closest('a[target=_blank]')) return;
   const mv=t.closest('[data-mv]'); if(mv){ const i=+mv.dataset.mv, j=i+(+mv.dataset.d); const w=PREFS.watch; [w[i],w[j]]=[w[j],w[i]]; applyPrefs(); return; }
   const rm=t.closest('[data-rm]'); if(rm){ PREFS.watch=PREFS.watch.filter(s=>s!==rm.dataset.rm); applyPrefs(); return; }
   const tg=t.closest('[data-tg]'); if(tg){ const s=tg.dataset.tg; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); return; }

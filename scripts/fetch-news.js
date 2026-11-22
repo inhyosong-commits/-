@@ -3,6 +3,7 @@
 // 뉴스는 1시간에 한 번만 새로 받고, 그 사이에는 이전 결과를 재사용합니다.
 const fs = require('fs');
 const path = require('path');
+const { makeTranslator } = require('../lib/translate');
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 const REFRESH_MS = 55 * 60 * 1000;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -43,18 +44,24 @@ async function fetchTopic(q, lang = 'ko') {
 
   let prev = null;
   if (prevUrl) { try { prev = await (await fetch(prevUrl, { cache: 'no-store' })).json(); } catch (e) { console.log('이전 뉴스 없음'); } }
-  const sameTopics = prev && prev.topics && Object.keys(topics).every(k => k in prev.topics);
+  const sameTopics = prev && prev.v === 2 && prev.topics && Object.keys(topics).every(k => k in prev.topics);
   if (sameTopics && prev.fetchedAt && Date.now() - prev.fetchedAt < REFRESH_MS && process.env.FORCE_NEWS !== '1') {
     fs.writeFileSync(out, JSON.stringify(prev));
     console.log('뉴스: 최근 것 재사용 (', Math.round((Date.now() - prev.fetchedAt) / 60000), '분 전 수집)');
     return;
   }
-  const result = { fetchedAt: Date.now(), topics: {} }, errors = {};
+  const result = { v: 2, fetchedAt: Date.now(), topics: {} }, errors = {};
   for (const [key, [q, lang]] of Object.entries(topics)) {
     try { result.topics[key] = await fetchTopic(q, lang); }
     catch (e) { errors[key] = e.message; if (prev && prev.topics && prev.topics[key]) result.topics[key] = prev.topics[key]; }
     await sleep(400);
   }
+  // 해외 뉴스 제목 번역 (이전 번역 재사용)
+  const cache = {};
+  if (prev && prev.topics) for (const v of Object.values(prev.topics)) for (const x of v || []) if (x.ko && x.title) cache[x.title] = x.ko;
+  const tr = makeTranslator(cache);
+  for (const [key, list] of Object.entries(result.topics)) if (key.startsWith('en:')) for (const x of list || []) { const k = await tr(x.title); if (k) x.ko = k; }
+  console.log('번역: 새로', tr.count(), '건');
   const ok = Object.values(result.topics).filter(v => v && v.length).length;
   console.log('뉴스: 주제', Object.keys(topics).length, '개 중', ok, '개 수집', Object.keys(errors).length ? errors : '');
   if (!ok && prev) { fs.writeFileSync(out, JSON.stringify(prev)); return; }
