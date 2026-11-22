@@ -6,7 +6,7 @@
 // 사용: node scripts/fetch-events.js public/events.json [이전 events.json URL]
 const fs = require('fs');
 const path = require('path');
-const { makeTranslator } = require('../lib/translate');
+const { translateAll } = require('../lib/translate');
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 const REFRESH_MS = 6 * 3600e3;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -148,7 +148,7 @@ async function earnings(syms) {
   const out = process.argv[2] || 'public/events.json', prevUrl = process.argv[3];
   let prev = null;
   if (prevUrl) { try { const r = await fetch(prevUrl, { cache: 'no-store' }); if (r.ok) prev = await r.json(); } catch (_) {} }
-  if (prev && prev.fetchedAt && Date.now() - prev.fetchedAt < REFRESH_MS && process.env.FORCE_EVENTS !== '1' && prev.trials && prev.v === 3 && (!DART_KEY || prev.dart)) {
+  if (prev && prev.fetchedAt && Date.now() - prev.fetchedAt < REFRESH_MS && process.env.FORCE_EVENTS !== '1' && prev.trials && prev.v === 4 && (!DART_KEY || prev.dart)) {
     prev.macro = MACRO; fs.writeFileSync(out, JSON.stringify(prev));
     console.log('일정: 최근 것 재사용 (', Math.round((Date.now() - prev.fetchedAt) / 60000), '분 전)'); return;
   }
@@ -156,7 +156,7 @@ async function earnings(syms) {
   const sb = html.slice(html.indexOf('const SECTORS = ['), html.indexOf('const STOCK_SECTOR'));
   const syms = [...new Set([...sb.matchAll(/\['([^']+)','([^']+)'\]/g)].filter(m => !/ETF/.test(m[2])).map(m => m[1]))];
   try { for (const x of JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'config', 'extra-stocks.json'), 'utf8'))) if (!syms.includes(x.sym)) syms.push(x.sym); } catch (_) {}
-  const res = { v: 3, fetchedAt: Date.now(), earnings: {}, macro: MACRO, bio: {} };
+  const res = { v: 4, fetchedAt: Date.now(), earnings: {}, macro: MACRO, bio: {} };
   try { res.earnings = await earnings(syms); }
   catch (e) { console.log('실적 일정 실패:', e.message); if (prev) res.earnings = prev.earnings || {}; }
   for (const [s, [q, lang]] of Object.entries(BIO)) {
@@ -171,10 +171,12 @@ async function earnings(syms) {
   const cache = {};
   if (prev) { for (const v of Object.values(prev.trials || {})) for (const x of v) for (const k of ['title', 'cond', 'summary']) if (x[k + 'Ko']) cache[x[k]] = x[k + 'Ko'];
     for (const v of Object.values(prev.bio || {})) for (const x of v || []) if (x.ko) cache[x.title] = x.ko; }
-  const tr = makeTranslator(cache);
-  for (const v of Object.values(res.trials || {})) for (const x of v) for (const k of ['title', 'cond', 'summary']) { const t = await tr(x[k]); if (t) x[k + 'Ko'] = t; }
-  for (const v of Object.values(res.bio || {})) for (const x of v || []) if (x.en) { const t = await tr(x.title); if (t) x.ko = t; }
-  console.log('일정 번역: 새로', tr.count(), '건');
+  const norm = t => t && t.replace(/\s+/g, ' ').trim();
+  const trials = Object.values(res.trials || {}).flat(), bioEn = Object.values(res.bio || {}).flat().filter(x => x && x.en);
+  const T = await translateAll([...trials.flatMap(x => [x.title, x.cond, x.summary]), ...bioEn.map(x => x.title)], cache);
+  for (const x of trials) for (const k of ['title', 'cond', 'summary']) { const t = cache[norm(x[k])]; if (t) x[k + 'Ko'] = t; }
+  for (const x of bioEn) { const t = cache[norm(x.title)]; if (t) x.ko = t; }
+  console.log('일정 번역: 새로', T.done, '/', T.todo, '건 (요청', T.calls, '번)');
   console.log('임상:', Object.entries(res.trials).map(([k, v]) => k + ' ' + v.length + '건').join(', '), '| DART:', res.dart ? Object.values(res.dart).flat().length + '건' : '없음');
   console.log('일정: 실적', Object.keys(res.earnings).length, '/', syms.length, '종목, 거시', MACRO.length, '건, 바이오 뉴스', Object.values(res.bio).flat().length, '건');
   fs.writeFileSync(out, JSON.stringify(res));
