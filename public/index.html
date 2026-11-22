@@ -330,7 +330,8 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
 const GROUPS = [
   ['growth', '경기·성장', '공장과 건설이 잘 돌아가는가 (중국·원자재 수요)'],
   ['infl', '인플레이션·에너지', '물가를 밀어 올리는 힘: 기름, 가스, 곡물'],
-  ['money', '돈의 흐름 (금리·달러)', '돈값(금리)과 돈이 어디로 가는가(달러·원화)'],
+  ['money', '돈의 흐름 (금리·달러)', '돈값(금리)과 돈이 어디로 가는가(달러)'],
+  ['krw', '한국 원화', '원화 가치: 오르면(▲) 원화 약세 = 해외여행·수입품 비싸짐, 수출기업엔 유리'],
   ['mood', '심리·안전자산', '시장이 겁먹었는가, 욕심내는가'],
   ['stocks', '주가', '결과적으로 기업과 투자자가 어떻게 보는가'],
   ['softs', '농산물·소프트', '날씨·작황 같은 공급 신호 (거시 신호는 약함)'],
@@ -358,7 +359,7 @@ const INSTR = [
   ['money','^TNX','미 10년물','%','yield','세계 돈값의 기준. 오르면 주식·부동산 부담'],
   ['money','^TYX','미 30년물','%','yield','장기 인플레·재정적자 우려를 반영'],
   ['money','DX-Y.NYB','달러인덱스','','pct','달러 힘. 강하면 원자재·신흥국에 압박'],
-  ['money','KRW=X','원/달러','₩','pct','오르면 원화 약세 = 외국인 자금 이탈·수입물가 상승'],
+  ['krw','KRW=X','원/달러','₩','pct','오르면 원화 약세 = 외국인 자금 이탈·수입물가 상승'],
   ['money','CNY=X','위안/달러','¥','pct','오르면 위안 약세 = 중국 경기·자본유출 우려'],
   ['money','JPY=X','엔/달러','¥','pct','엔은 위기 때 강해지는 안전통화. 급락(엔 강세) = 위험회피'],
   ['money','EURUSD=X','유로/달러','$','pct','유럽 경기와 미·유럽 금리 차'],
@@ -383,6 +384,9 @@ const DERIVED = [
   ['BW','브렌트−WTI 스프레드','$','abs',(a,b)=>a-b,['BZ=F','CL=F'],'벌어지면 해상 운송·중동 공급 리스크','infl'],
   ['CURVE2','장단기 금리차 (10년−2년)','%p','yield',(a,b)=>a-b,['^TNX','2YY=F'],'음수(역전)면 경기침체 선행 신호. 역전이 풀릴 때도 주의','money'],
   ['CURVE','장단기 금리차 (10년−3개월)','%p','yield',(a,b)=>a-b,['^TNX','^IRX'],'연준이 가장 신뢰한다는 침체 예측 지표','money'],
+  ['KRWJPY','원/엔 (100엔당)','₩','pct',(a,b)=>a/b*100,['KRW=X','JPY=X'],'일본 여행·일본과 경쟁하는 수출기업(자동차·조선)에 영향','krw'],
+  ['KRWEUR','원/유로','₩','pct',(a,b)=>a*b,['KRW=X','EURUSD=X'],'유럽 여행·유럽 수입품 가격','krw'],
+  ['KRWCNY','원/위안','₩','pct',(a,b)=>a/b,['KRW=X','CNY=X'],'최대 교역국 중국과의 무역 가격 경쟁력','krw'],
   ['GSR','금/은 비율','배','pct',(a,b)=>a/b,['GC=F','SI=F'],'높을수록 산업수요 약함·위험회피 (평균 60~70배)','mood'],
 ];
 const META = {};
@@ -947,7 +951,7 @@ function renderGroups(){
   }).join('');
   const alerts = INSIGHTS.filter(x=>x.level!=='info').length;
   const short = {growth:'경기',infl:'인플레',money:'금리·달러',mood:'심리',stocks:'주가',softs:'농산물'};
-  $('secnav').innerHTML = `<a href="#s-world">요약</a><a href="#s-top">신호${alerts?`<b>${alerts}</b>`:''}</a><a href="#s-watch">내 종목</a><a href="#s-sec">섹터</a><a href="#s-all">전체 지표</a>`;
+  $('secnav').innerHTML = `<a href="#s-world">요약</a><a href="#s-top">신호${alerts?`<b>${alerts}</b>`:''}</a><a href="#s-watch">내 종목</a><a href="#s-sec">섹터</a><a href="#g-krw" data-open-g="krw">원화</a><a href="#s-all">전체 지표</a>`;
 }
 function tile(s, flagged){
       const m=METRICS[s], meta=META[s];
@@ -1076,6 +1080,7 @@ document.addEventListener('click', e=>{
   const rm=t.closest('[data-rm]'); if(rm){ PREFS.watch=PREFS.watch.filter(s=>s!==rm.dataset.rm); applyPrefs(); return; }
   const tg=t.closest('[data-tg]'); if(tg){ const s=tg.dataset.tg; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); return; }
   if(t===$('edit')){ $('edit').classList.remove('open'); return; }
+  const og=t.closest('[data-open-g]'); if(og){ const d=document.querySelector(`details[data-g="${og.dataset.openG}"]`); if(d) d.open=true; }
   const star=t.closest('[data-star]'); if(star){ const s=star.dataset.star; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); return; }
   const so=t.closest('[data-sec-open]'); if(so){ openSector(so.dataset.secOpen); return; }
   if(t===$('secm')){ $('secm').classList.remove('open'); return; }
