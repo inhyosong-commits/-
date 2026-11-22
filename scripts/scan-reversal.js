@@ -49,7 +49,7 @@ async function fundamentals(x) {
   const f = { fin: null, eps: null, flow: null, finNote: null, epsNote: null, flowNote: null };
   const p2 = Math.floor(Date.now() / 1000), p1 = p2 - 86400 * 820;
   try { // 분기 영업이익: 최근 분기 vs 1년 전 같은 분기
-    const TY = ['OperatingIncome', 'StockholdersEquity', 'TotalLiabilitiesNetMinorityInterest', 'CurrentAssets', 'CurrentLiabilities', 'CashAndCashEquivalents'];
+    const TY = ['OperatingIncome', 'StockholdersEquity', 'TotalLiabilitiesNetMinorityInterest', 'CurrentAssets', 'CurrentLiabilities', 'CashAndCashEquivalents', 'CashCashEquivalentsAndShortTermInvestments'];
     const types = TY.flatMap(k => ['quarterly' + k, 'annual' + k]).join(',');
     const j = await J(`https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(x.s)}?type=${types}&period1=${p1}&period2=${p2}`);
     const G = {}; for (const r of j.timeseries.result || []) for (const [k, a] of Object.entries(r)) if (Array.isArray(a) && /^(quarterly|annual)/.test(k)) G[k] = a.filter(Boolean).map(z => ({ d: z.asOfDate, v: z.reportedValue && z.reportedValue.raw })).filter(z => z.v != null).sort((p, q) => p.d.localeCompare(q.d));
@@ -88,7 +88,7 @@ async function fundamentals(x) {
 // 망하지 않을 회사인지: 자본잠식, 부채비율, 유동비율, 최근 1년 영업이익, 현금으로 버틸 수 있는 기간
 function safetyOf(G, x) {
   const last = k => { const q = G['quarterly' + k] || [], a = G['annual' + k] || []; const z = [...q, ...a].sort((p, r) => p.d.localeCompare(r.d)); return z.length ? z[z.length - 1] : null; };
-  const eq = last('StockholdersEquity'), li = last('TotalLiabilitiesNetMinorityInterest'), ca = last('CurrentAssets'), cl = last('CurrentLiabilities'), cash = last('CashAndCashEquivalents');
+  const eq = last('StockholdersEquity'), li = last('TotalLiabilitiesNetMinorityInterest'), ca = last('CurrentAssets'), cl = last('CurrentLiabilities'), cash = last('CashCashEquivalentsAndShortTermInvestments') || last('CashAndCashEquivalents');
   const oq = G.quarterlyOperatingIncome || [], oa = G.annualOperatingIncome || [];
   const op4 = oq.length >= 4 ? oq.slice(-4).reduce((p, r) => p + r.v, 0) : oa.length ? oa[oa.length - 1].v : null;
   const lossQ = (() => { let n = 0; for (let i = oq.length - 1; i >= 0 && oq[i].v < 0; i--) n++; return n; })();
@@ -100,7 +100,7 @@ function safetyOf(G, x) {
   if (ca && cl && cl.v > 0 && !fin) { n++; const r = ca.v / cl.v * 100; const t = `유동비율 ${Math.round(r)}%`; if (r >= 150) { good++; items.push(['good', t + ' (1년 안에 갚을 돈 충분)']); } else if (r < 100) { bad++; items.push(['bad', t + ' (1년 안에 갚을 빚이 현금성 자산보다 많음)']); } else items.push(['mid', t]); }
   if (op4 != null) { n++; if (op4 > 0) { good++; items.push(['good', '최근 1년 영업이익 흑자']); } else {
     items.push(['bad', `최근 1년 영업적자${lossQ >= 4 ? ` (${lossQ}분기 연속)` : ''}${lossY >= 3 ? `, ${lossY}년 연속` : ''}`]); bad++;
-    if (cash) { const yrs = cash.v / -op4; items.push([yrs < 1 ? 'bad' : 'mid', `현금으로 지금 적자를 약 ${yrs < 1 ? Math.max(1, Math.round(yrs * 12)) + '개월' : yrs.toFixed(1) + '년'} 버틸 수 있음`]); if (yrs < 1) bad++; } } }
+    if (cash) { const yrs = cash.v / -op4; items.push([yrs < 1 ? 'bad' : 'mid', `현금(단기 투자 포함)으로 지금 적자를 약 ${yrs < 1 ? Math.max(1, Math.round(yrs * 12)) + '개월' : yrs.toFixed(1) + '년'} 버틸 수 있음`]); if (yrs < 1) bad++; } } }
   if (!n) return null;
   return { lv: bad >= 2 || (eq && eq.v <= 0) ? 2 : bad === 1 ? 1 : 0, items, asOf: eq ? eq.d : op4 != null && oq.length ? oq[oq.length - 1].d : null };
 }
