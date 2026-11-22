@@ -49,8 +49,11 @@ async function trials() {
     try {
       const list = []; let token = '';
       for (let page = 0; page < 4; page++) {
-        const u = `https://clinicaltrials.gov/api/v2/studies?query.spons=${encodeURIComponent(spons)}&filter.overallStatus=RECRUITING,ACTIVE_NOT_RECRUITING,ENROLLING_BY_INVITATION,NOT_YET_RECRUITING,COMPLETED&pageSize=200${token ? '&pageToken=' + token : ''}`;
-        const r = await fetch(u, { headers: { 'User-Agent': UA, Accept: 'application/json' } });
+        const d = t => new Date(t).toISOString().slice(0, 10);
+        const adv = `&filter.advanced=${encodeURIComponent(`AREA[Phase]PHASE3 AND AREA[PrimaryCompletionDate]RANGE[${d(from)},${d(to)}]`)}`;
+        const base = `https://clinicaltrials.gov/api/v2/studies?query.spons=${encodeURIComponent(spons)}&pageSize=200${token ? '&pageToken=' + token : ''}`;
+        let r = await fetch(base + adv, { headers: { 'User-Agent': UA, Accept: 'application/json' } });
+        if (!r.ok && page === 0) { console.log('임상 고급검색 실패', r.status, '→ 일반 검색'); r = await fetch(base + '&filter.overallStatus=RECRUITING,ACTIVE_NOT_RECRUITING,ENROLLING_BY_INVITATION,NOT_YET_RECRUITING', { headers: { 'User-Agent': UA, Accept: 'application/json' } }); }
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const j = await r.json();
         for (const st of j.studies || []) {
@@ -142,14 +145,14 @@ async function earnings(syms) {
   const out = process.argv[2] || 'public/events.json', prevUrl = process.argv[3];
   let prev = null;
   if (prevUrl) { try { const r = await fetch(prevUrl, { cache: 'no-store' }); if (r.ok) prev = await r.json(); } catch (_) {} }
-  if (prev && prev.fetchedAt && Date.now() - prev.fetchedAt < REFRESH_MS && process.env.FORCE_EVENTS !== '1' && prev.trials && (!DART_KEY || prev.dart)) {
+  if (prev && prev.fetchedAt && Date.now() - prev.fetchedAt < REFRESH_MS && process.env.FORCE_EVENTS !== '1' && prev.trials && prev.v === 2 && (!DART_KEY || prev.dart)) {
     prev.macro = MACRO; fs.writeFileSync(out, JSON.stringify(prev));
     console.log('일정: 최근 것 재사용 (', Math.round((Date.now() - prev.fetchedAt) / 60000), '분 전)'); return;
   }
   const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
   const sb = html.slice(html.indexOf('const SECTORS = ['), html.indexOf('const STOCK_SECTOR'));
   const syms = [...new Set([...sb.matchAll(/\['([^']+)','([^']+)'\]/g)].filter(m => !/ETF/.test(m[2])).map(m => m[1]))];
-  const res = { fetchedAt: Date.now(), earnings: {}, macro: MACRO, bio: {} };
+  const res = { v: 2, fetchedAt: Date.now(), earnings: {}, macro: MACRO, bio: {} };
   try { res.earnings = await earnings(syms); }
   catch (e) { console.log('실적 일정 실패:', e.message); if (prev) res.earnings = prev.earnings || {}; }
   for (const [s, [q, lang]] of Object.entries(BIO)) {
