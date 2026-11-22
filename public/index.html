@@ -44,6 +44,7 @@ body.pick nav.sec, body.pick #tab-mkt, body.cal nav.sec, body.cal #tab-mkt{displ
 .ctag{font-size:11px;font-weight:700;padding:3px 7px;border-radius:6px;white-space:nowrap;background:var(--surface-2);color:var(--text-secondary)} .ctag.e{color:#e08a00} .ctag.m{color:#3b82f6} .ctag.t{color:#a855f7}
 .tl{list-style:none;margin:0;padding:0} .tl li{padding:8px 0;border-top:1px solid var(--border);font-size:13px;line-height:1.45} .tl li a{color:var(--text-primary);text-decoration:none} .tl li span{display:block;color:var(--text-muted);font-size:12px}
 .crow.mine{border-color:var(--st-warn)}
+.scn{margin-top:6px;font-size:12.5px;line-height:1.5;display:grid;gap:3px} .scn b{font-weight:700;margin-right:3px} .scn b.up{color:var(--up)} .scn b.down{color:var(--down)} .scn .note{margin:2px 0 0}
 .pbox{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:14px;margin:10px 0}
 .pbox h3{margin:0 0 4px;font-size:16px} .pbox .pd{color:var(--text-secondary);font-size:13px;margin:0 0 8px;line-height:1.5}
 .prow{display:grid;grid-template-columns:minmax(0,1fr) auto 40px;gap:8px;align-items:center;padding:10px 2px;border-top:1px solid var(--border);cursor:pointer}
@@ -1174,21 +1175,43 @@ function earnTag(s){
   return `<span class="tag" style="color:#e08a00">실적 ${d===0?'오늘':'D-'+d}</span>`;
 }
 const MK = {fomc:['금리','미국 금리 결정'],cpi:['물가','미국 물가'],jobs:['고용','미국 고용']};
+/* 결과에 따라 주가가 어떻게 움직이는지 (일반적인 경향) */
+const MACRO_SCEN = {
+  fomc:{up:'금리를 내리거나 "앞으로 내리겠다"는 신호 → 대출·투자 부담 감소 → 주가 상승, 특히 성장주(기술·바이오)와 코스피에 유리, 달러 약세·원화 강세',
+        dn:'금리를 유지하면서 "더 오래 높게 간다"는 신호 → 돈줄이 계속 조여짐 → 주가 하락, 달러 강세·원/달러 상승',
+        key:'결정 자체보다 "시장 예상과 비교"와 의장 발언이 더 중요해요.'},
+  cpi:{up:'물가가 예상보다 낮게 나옴 → 금리 인하 기대 커짐 → 주가 상승, 달러 약세, 원화 강세',
+       dn:'물가가 예상보다 높게 나옴 → 금리 인하가 멀어짐 → 주가 하락(특히 기술주), 달러 강세, 원/달러 상승',
+       key:'숫자 자체보다 "예상치보다 높은지 낮은지"가 주가를 움직여요.'},
+  jobs:{up:'일자리가 적당히 늘어남(너무 뜨겁지도 차갑지도 않음) → 경기는 괜찮고 금리 걱정은 줄어듦 → 주가 상승',
+        dn:'너무 강하면 → 금리 인하가 늦어질 걱정 → 주가 하락 / 너무 약하면 → 경기 침체 걱정 → 주가 하락, 금리·달러 하락',
+        key:'"적당히"가 가장 좋은, 양쪽 끝이 다 나쁜 지표예요.'},
+};
+const SEC_KEY = {semi:'메모리 가격, AI 서버(HBM) 수요, 다음 분기 전망',power:'데이터센터·전력망 수주 잔고',battery:'전기차 판매, 공장 가동률, 미국 보조금',steel:'중국 수요, 철강 가격과 원가(철광석) 차이',energy:'유가와 정제 마진',ship:'신규 수주, 배 가격(선가), 수주 잔고',defense:'해외 수출 계약',auto:'판매 대수, 환율 효과, 관세',fin:'예대마진(이자 장사), 배당 확대',bio:'주력 약 매출, 신약 진행 상황',internet:'광고·커머스 성장, AI 투자 비용'};
+function earnScen(s){
+  const sec=SECTORS.find(x=>x.id===STOCK_SECTOR[s]); const key=sec&&SEC_KEY[sec.id];
+  const peers = sec? sec.stocks.filter(([p])=>p!==s&&META[p]&&mkOf(p)!==mkOf(s)).slice(0,3).map(([,n])=>n) : [];
+  const peersKr = sec? sec.stocks.filter(([p])=>p!==s&&META[p]&&mkOf(p)===mkOf(s)).slice(0,2).map(([,n])=>n) : [];
+  return {up:`매출·이익이 증권사 예상(컨센서스)보다 좋고, 다음 분기 전망(가이던스)도 올리면 → 주가 상승${peersKr.length?', '+peersKr.join('·')+' 등 같은 업종도 동반 상승':''}`,
+          dn:`예상보다 나쁘거나 다음 분기 전망을 낮추면 → 주가 하락. 실적이 좋아도 이미 기대가 주가에 반영돼 있으면 떨어지기도 해요.`,
+          key:(key?`이 업종은 "${key}"를 특히 봐요.`:'')+(peers.length?` 결과는 ${peers.join('·')}에도 영향을 줄 수 있어요.`:'')};
+}
+const TRIAL_SCEN = {up:'주요 목표 달성(성공) → 허가·매출 기대 → 주가 급등 가능, 같은 약을 개발하는 경쟁사는 하락하기도',dn:'목표 미달(실패)이나 부작용 → 주가 급락. 회사 매출에서 이 약의 비중이 클수록 충격이 커요.',key:'결과 발표는 보통 임상이 끝나고 몇 주~몇 달 뒤, 학회나 보도자료로 나와요.'};
 function calItems(){
   const now=Date.now(), out=[];
   if(!EVENTS) return out;
-  for(const m of EVENTS.macro||[]){ const t=Date.parse(m.date+'T12:00:00Z'); const d=dday(t); if(d>=0&&d<=60) out.push({t,d,kind:'m',tag:MK[m.kind]?MK[m.kind][0]:'거시',title:m.title,why:m.why}); }
+  for(const m of EVENTS.macro||[]){ const t=Date.parse(m.date+'T12:00:00Z'); const d=dday(t); if(d>=0&&d<=60) out.push({t,d,kind:'m',mk:m.kind,tag:MK[m.kind]?MK[m.kind][0]:'거시',title:m.title,why:m.why}); }
   for(const [s,e] of Object.entries(EVENTS.earnings||{})){
     if(!META[s]) continue; const d=dday(e.date); if(d<0||d>60) continue;
     const sec=SECTORS.find(x=>x.id===STOCK_SECTOR[s]);
     const range = e.end&&dday(e.end)!==d ? ` ~ ${new Date(e.end).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'})} 사이` : '';
     out.push({t:e.date,d,kind:'e',tag:'실적',sym:s,mine:PREFS.watch.includes(s),title:`${META[s].name} 실적 발표${e.estimate?' (예상일)':''}`,
-      why:`${sec?sec.name+' 업종 · ':''}분기 성적표 발표${range}. 같은 업종 종목도 함께 움직일 수 있어요.`});
+      why:`${sec?sec.name+' 업종 · ':''}분기 성적표 발표${range}.`, scen:earnScen(s)});
   }
   for(const [s,list] of Object.entries(EVENTS.trials||{})) for(const tr of list){
     const d=dday(tr.date); if(d<0||d>60||!META[s]) continue;
     out.push({t:tr.date,d,kind:'t',tag:'임상',sym:s,mine:PREFS.watch.includes(s),title:`${META[s].name} 3상 임상 마무리 ${tr.month?'(이달 중) ':''}${tr.est?'예정':''}: ${tr.acronym||tr.title}`,
-      why:`${tr.cond||''} · 임상이 끝난 뒤 보통 몇 주~몇 달 안에 핵심 결과가 발표돼요. 성공이면 주가에 큰 호재, 실패면 큰 악재.`});
+      why:`${tr.cond||''}`, scen:TRIAL_SCEN});
   }
   return out.filter(x=>!calMine||x.mine||x.kind==='m').sort((a,b)=>a.t-b.t);
 }
@@ -1211,7 +1234,7 @@ function renderCal(){
   for(const x of items){
     const day=kstDay(x.t);
     if(day!==last){ last=day; const dt=new Date(day); html+=`<div class="cday">${dt.getUTCMonth()+1}월 ${dt.getUTCDate()}일 (${'일월화수목금토'[dt.getUTCDay()]})<b>${x.d===0?'오늘':'D-'+x.d}</b></div>`; }
-    html+=`<div class="crow ${x.mine?'mine':''}" ${x.sym?`data-sym="${x.sym}"`:''}><span class="ctag ${x.kind}">${x.tag}</span><div><div class="ct">${x.mine?'★ ':''}${x.sym?mkBadge(x.sym):''}${esc(x.title)}</div><div class="cw">${esc(x.why)}</div></div></div>`;
+    html+=`<div class="crow ${x.mine?'mine':''}" ${x.sym?`data-sym="${x.sym}"`:''}><span class="ctag ${x.kind}">${x.tag}</span><div><div class="ct">${x.mine?'★ ':''}${x.sym?mkBadge(x.sym):''}${esc(x.title)}</div><div class="cw">${esc(x.why)}</div>${(()=>{ const sc=x.scen||(x.mk&&MACRO_SCEN[x.mk]); return sc?`<div class="scn"><div><b class="up">▲ 좋으면</b> ${esc(sc.up)}</div><div><b class="down">▼ 나쁘면</b> ${esc(sc.dn)}</div>${sc.key?`<div class="note">💡 ${esc(sc.key)}</div>`:''}</div>`:''; })()}</div></div>`;
   }
   if(!EVENTS) html=`<p class="note">일정 데이터를 아직 못 받았어요. 몇 분 뒤 새로고침해 주세요.</p>`;
   else if(!items.length) html=`<p class="note">앞으로 60일 안에 잡힌 일정이 없어요.</p>`;
