@@ -1,0 +1,159 @@
+// 상승 전환 후보 스캔 (하루 2번, 별도 워크플로) → reversal.json, revseries.json
+// 한국: 코스피 시총 상위 400 + 코스닥 상위 300 / 미국: 나스닥·NYSE 시총 상위 각 450
+// 사용: node scripts/scan-reversal.js 출력폴더
+const fs = require('fs');
+const path = require('path');
+const { fetchChart } = require('../lib/yahoo');
+const R = require('../lib/reversal');
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const num = v => { const x = +String(v == null ? '' : v).replace(/[$,%+\s]/g, ''); return isFinite(x) ? x : null; };
+async function J(u, h = {}) { const r = await fetch(u, { headers: { 'User-Agent': UA, Accept: 'application/json', ...h } }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
+async function pool(list, n, fn) { let i = 0; await Promise.all(Array.from({ length: n }, async () => { while (i < list.length) { const k = i++; try { await fn(list[k], k); } catch (_) {} } })); }
+const OUT = process.argv[2] || 'scan-out';
+const VARIANTS = []; for (const L of [63, 126, 252]) for (const m of [1.5, 2]) VARIANTS.push([L, m]);
+const DEF = '126_1.5';
+const SEC_KO = { Technology: '기술', 'Information Technology': '기술', 'Health Care': '헬스케어', Healthcare: '헬스케어', Finance: '금융', 'Financial Services': '금융', Financials: '금융', 'Consumer Discretionary': '경기소비재', 'Consumer Cyclical': '경기소비재', 'Consumer Staples': '필수소비재', 'Consumer Defensive': '필수소비재', Industrials: '산업재', Energy: '에너지', 'Basic Materials': '소재', Materials: '소재', Utilities: '유틸리티', 'Real Estate': '부동산', Telecommunications: '통신', 'Communication Services': '통신' };
+
+async function universe() {
+  const out = [];
+  for (const [mkt, pages] of [['KOSPI', 4], ['KOSDAQ', 3]]) for (let p = 1; p <= pages; p++) {
+    const d = await J(`https://m.stock.naver.com/api/stocks/marketValue/${mkt}?page=${p}&pageSize=100`, { Referer: 'https://m.stock.naver.com/' });
+    for (const x of d.stocks || []) if (x.stockEndType === 'stock' && /^\d{6}$/.test(x.itemCode)) out.push({ s: x.itemCode + (mkt === 'KOSDAQ' ? '.KQ' : '.KS'), n: x.stockName, mk: mkt, cap: num(x.marketValue) * 1e8, cur: 'KRW' });
+    await sleep(150);
+  }
+  for (const ex of ['nasdaq', 'nyse']) {
+    const d = await J(`https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=10000&exchange=${ex}&download=true`, { Origin: 'https://www.nasdaq.com', Referer: 'https://www.nasdaq.com/' });
+    const rows = (d.data && (d.data.rows || (d.data.table && d.data.table.rows))) || [];
+    rows.map(x => ({ s: String(x.symbol || '').trim().replace('/', '-'), n: String(x.name || '').replace(/\s+(Common Stock|Class [A-C] (Common Stock|Ordinary Shares)|Ordinary Shares|American Depositary Shares).*$/i, '').trim(), mk: ex.toUpperCase(), cap: num(x.marketCap), sec: SEC_KO[x.sector] || x.sector || null, cur: 'USD' }))
+      .filter(x => x.s && !/[\^]/.test(x.s) && x.cap > 0).sort((a, b) => b.cap - a.cap).slice(0, 450).forEach(x => out.push(x));
+  }
+  return out;
+}
+const dkey = t => Math.floor((t + 9 * 3600) / 86400); // 날짜 키 (한국시간 기준 일)
+function align(st, ix) { // 지수를 종목 날짜에 맞춤 (그 날짜까지의 마지막 값)
+  const m = new Map(); ix.t.forEach((t, i) => m.set(dkey(t), ix.c[i]));
+  const keys = [...m.keys()].sort((a, b) => a - b); let j = 0, lastV = null; const out = [];
+  for (const t of st.t) { const k = dkey(t); while (j < keys.length && keys[j] <= k) { lastV = m.get(keys[j]); j++; } out.push(lastV); }
+  return out;
+}
+
+let yck = null;
+async function yahooSession() {
+  const r1 = await fetch('https://fc.yahoo.com/', { headers: { 'User-Agent': UA }, redirect: 'manual' });
+  const cookie = (r1.headers.getSetCookie ? r1.headers.getSetCookie() : []).map(c => c.split(';')[0]).join('; ');
+  const crumb = (await (await fetch('https://query2.finance.yahoo.com/v1/test/getcrumb', { headers: { 'User-Agent': UA, Cookie: cookie } })).text()).trim();
+  return { cookie, crumb };
+}
+async function fundamentals(x) {
+  const f = { fin: null, eps: null, flow: null, finNote: null, epsNote: null, flowNote: null };
+  const p2 = Math.floor(Date.now() / 1000), p1 = p2 - 86400 * 820;
+  try { // 분기 영업이익: 최근 분기 vs 1년 전 같은 분기
+    const j = await J(`https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(x.s)}?type=quarterlyOperatingIncome&period1=${p1}&period2=${p2}`);
+    const arr = ((j.timeseries.result || [])[0] || {}).quarterlyOperatingIncome || [];
+    const q = arr.filter(Boolean).map(a => ({ d: a.asOfDate, v: a.reportedValue && a.reportedValue.raw })).filter(a => a.v != null).sort((a, b) => a.d.localeCompare(b.d));
+    if (q.length >= 5) {
+      const a = q[q.length - 1], b = q[q.length - 5];
+      if (b.v < 0 && a.v > 0) { f.fin = true; f.finNote = `흑자 전환 (${a.d.slice(0, 7)} 분기)`; }
+      else if (b.v < 0 && a.v < 0 && a.v > b.v) { f.fin = true; f.finNote = `적자 축소 (${a.d.slice(0, 7)} 분기)`; }
+      else if (b.v > 0 && a.v > b.v) { f.fin = true; f.finNote = `영업이익 ${Math.round((a.v / b.v - 1) * 100)}% 증가 (전년 같은 분기 대비)`; }
+      else { f.fin = false; f.finNote = a.v < 0 ? '적자 지속·확대' : `영업이익 ${Math.round((a.v / b.v - 1) * 100)}% (전년 같은 분기 대비)`; }
+    }
+  } catch (_) {}
+  try { // EPS 전망 변화 (애널리스트 예상치 60일 전 대비)
+    const j = await J(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(x.s)}?modules=earningsTrend,assetProfile&crumb=${encodeURIComponent(yck.crumb)}`, { Cookie: yck.cookie });
+    const r = j.quoteSummary.result[0];
+    if (!x.sec && r.assetProfile && r.assetProfile.sector) x.sec = SEC_KO[r.assetProfile.sector] || r.assetProfile.sector;
+    const tr = ((r.earningsTrend || {}).trend || []).find(t => t.period === '+1y') || ((r.earningsTrend || {}).trend || []).find(t => t.period === '0y');
+    const et = tr && tr.epsTrend, cur = et && et.current && et.current.raw, old = et && ((et['60daysAgo'] && et['60daysAgo'].raw) || (et['30daysAgo'] && et['30daysAgo'].raw));
+    if (cur != null && old != null && old !== 0) { const ch = (cur / old - 1) * 100 * Math.sign(old); f.eps = ch > 1; f.epsNote = `${tr.period === '+1y' ? '내년' : '올해'} EPS 예상 ${ch > 0 ? '+' : ''}${ch.toFixed(1)}% (60일 전 대비)`; }
+  } catch (_) {}
+  if (/\.K[SQ]$/.test(x.s)) try { // 수급: 최근 5일 vs 그 전 5일 (외국인+기관 순매수 금액)
+    const j = await J(`https://m.stock.naver.com/api/stock/${x.s.slice(0, 6)}/integration`, { Referer: 'https://m.stock.naver.com/' });
+    const d = (j.dealTrendInfos || []).map(a => ((num(a.foreignerPureBuyQuant) || 0) + (num(a.organPureBuyQuant) || 0)) * (num(a.closePrice) || 0) / 1e8);
+    if (d.length >= 10) { const a = d.slice(0, 5).reduce((p, q) => p + q, 0), b = d.slice(5, 10).reduce((p, q) => p + q, 0); f.flow = a > b && a > 0; f.flowNote = `외국인+기관 최근 5일 ${a >= 0 ? '+' : ''}${Math.round(a).toLocaleString('ko-KR')}억 (그 전 5일 ${b >= 0 ? '+' : ''}${Math.round(b).toLocaleString('ko-KR')}억)`; }
+    else if (d.length >= 5) { const a = d.slice(0, 5).reduce((p, q) => p + q, 0); f.flow = a > 0; f.flowNote = `외국인+기관 최근 5일 ${Math.round(a)}억`; }
+  } catch (_) {}
+  return f;
+}
+
+function evalVariant(c, v, idx, e, L, m, F) {
+  const t = R.tech(c, v, idx, e, { L, mult: m }); if (!t) return null;
+  const it = R.items(t, F), { sc, cov } = R.scoreOf(it), st = R.stageOf(t, it);
+  return { t, it, sc, cov, st };
+}
+const ymd = t => new Date((t + 9 * 3600) * 1000).toISOString().slice(0, 10);
+
+(async () => {
+  fs.mkdirSync(OUT, { recursive: true });
+  const t0 = Date.now();
+  const U = await universe();
+  console.log('스캔 대상:', U.length, '종목', U.filter(x => x.cur === 'KRW').length, '한국 /', U.filter(x => x.cur === 'USD').length, '미국');
+  const IDX = {};
+  for (const s of ['^KS11', '^KQ11', '^GSPC', '^IXIC']) IDX[s] = await fetchChart(s, '2y');
+  const idxOf = x => x.mk === 'KOSPI' ? '^KS11' : x.mk === 'KOSDAQ' ? '^KQ11' : x.mk === 'NASDAQ' ? '^IXIC' : '^GSPC';
+  const S = {}; let fail = 0;
+  await pool(U, 8, async x => { try { const d = await fetchChart(x.s, '2y'); if (d.c && d.c.length > 300) S[x.s] = d; else fail++; } catch (e) { fail++; } });
+  console.log('시세:', Object.keys(S).length, '성공 /', fail, '실패', ((Date.now() - t0) / 1000).toFixed(0) + '초');
+  // 1차: 기술적 지표만으로 거르기 (재무·수급 N/A)
+  const NOF = { fin: null, eps: null, flow: null };
+  const short = [];
+  for (const x of U) {
+    const d = S[x.s]; if (!d) continue;
+    x.idx = align(d, IDX[idxOf(x)]);
+    const e = d.c.length - 1;
+    let best = 0, stg = 0;
+    for (const [L, m] of VARIANTS) { const r = evalVariant(d.c, d.vol, x.idx, e, L, m, NOF); if (r) { best = Math.max(best, r.sc); stg = Math.max(stg, r.st); } }
+    if (best >= 30 || stg >= 1) short.push(x);
+  }
+  console.log('1차 통과:', short.length, '종목', ((Date.now() - t0) / 1000).toFixed(0) + '초');
+  try { yck = await yahooSession(); } catch (e) { yck = { cookie: '', crumb: '' }; }
+  await pool(short, 6, async x => { x.F = await fundamentals(x); });
+  console.log('재무·수급:', short.filter(x => x.F && x.F.fin != null).length, '재무 /', short.filter(x => x.F && x.F.eps != null).length, 'EPS /', short.filter(x => x.F && x.F.flow != null).length, '수급', ((Date.now() - t0) / 1000).toFixed(0) + '초');
+
+  const out = [], series = {};
+  for (const x of short) {
+    const d = S[x.s], c = d.c, v = d.vol, e = c.length - 1, F = x.F || NOF;
+    const V = {};
+    for (const [L, m] of VARIANTS) {
+      const key = L + '_' + m;
+      const r = evalVariant(c, v, x.idx, e, L, m, F); if (!r) continue;
+      const rp = evalVariant(c, v, x.idx, e - 1, L, m, F);
+      // 2단계 최초 진입일: 기술적 조건만으로 과거 20일을 다시 계산 (미래 데이터 사용 안 함)
+      let first2 = null;
+      if (r.st >= 2) { first2 = e; for (let k = 1; k <= 20; k++) { const h = evalVariant(c, v, x.idx, e - k, L, m, { fin: null, eps: null, flow: null }); if (h && h.st >= 2) first2 = e - k; else break; } }
+      const nw = [];
+      if (r.st === 2 && first2 != null && first2 >= e - 4) nw.push('stage2');
+      if (rp && r.sc - rp.sc >= 15) nw.push('jump');
+      if (r.t.crossUp != null && r.t.crossUp >= e - 4 && r.t.belowLong) nw.push('ma60');
+      if (r.t.brkIdx != null && r.t.brkIdx >= e - 4 && r.t.volOk) nw.push('brkvol');
+      V[key] = [r.sc, r.cov, r.st, Object.keys(R.PTS).map(k => r.it[k] == null ? 2 : r.it[k] ? 1 : 0).join(''), first2 != null ? ymd(d.t[first2]) : null, nw, rp ? r.sc - rp.sc : 0, +((c[e] / r.t.low - 1) * 100).toFixed(1), r.t.volx == null ? null : +r.t.volx.toFixed(2)];
+    }
+    const best = Math.max(...Object.values(V).map(a => a[0]), 0), stg = Math.max(...Object.values(V).map(a => a[2]), 0);
+    if (best < 40 && stg < 1) continue;
+    const D = evalVariant(c, v, x.idx, e, 126, 1.5, F); if (!D) continue;
+    const t = D.t, ix = x.idx, ma60i = R.sma(ix, 60, e);
+    const risk = [];
+    if (t.hlIdx != null && c[e] < c[t.hlIdx]) risk.push('최근 저점(Higher Low) 아래로 내려감: 전환 실패 가능');
+    if (c[e] < t.ma20) risk.push('20일선 아래로 밀림');
+    if (t.rsi > 75) risk.push(`단기 과열 (RSI ${Math.round(t.rsi)})`);
+    if (c[e] / t.ma20 > 1.15) risk.push('20일선과 15% 이상 벌어짐 (과열)');
+    if (t.brk && t.volOk === false) risk.push('거래량이 늘지 않은 돌파');
+    if (ix[e] && ma60i && ix[e] < ma60i) risk.push('시장 지수가 60일선 아래 (시장 전체 약세)');
+    if (F.fin === false) risk.push('실적 개선 미확인');
+    const gcDate = t.gc != null ? ymd(d.t[t.gc]) : null;
+    out.push({ s: x.s, n: x.n, mk: x.mk, cap: x.cap, sec: x.sec || null, cur: x.cur, px: +c[e].toPrecision(6), d1: +((c[e] / c[e - 1] - 1) * 100).toFixed(2), asOf: ymd(d.t[e]), V,
+      det: { low: [ymd(d.t[t.mlo]), +t.low.toPrecision(6)], hl: t.hlIdx != null ? [ymd(d.t[t.hlIdx]), +c[t.hlIdx].toPrecision(6)] : null, refHi: t.refHi != null ? [ymd(d.t[t.refHiIdx]), +t.refHi.toPrecision(6)] : null,
+        brk: t.brkIdx != null ? ymd(d.t[t.brkIdx]) : null, gc: gcDate, ma60x: t.crossUp != null ? ymd(d.t[t.crossUp]) : null, volx: t.volx, ma20: +t.ma20.toPrecision(6), ma60: +t.ma60.toPrecision(6), ma120: +t.ma120.toPrecision(6), rsi: Math.round(t.rsi),
+        fin: F.finNote, eps: F.epsNote, flow: F.flowNote, risk } });
+    series[x.s] = { t: d.t.slice(-260).map(z => Math.floor(z / 60)), c: c.slice(-260).map(z => +z.toPrecision(6)) };
+  }
+  out.sort((a, b) => b.V[DEF] && a.V[DEF] ? b.V[DEF][0] - a.V[DEF][0] : 0);
+  const asOf = { KR: (out.find(x => x.cur === 'KRW') || {}).asOf || null, US: (out.find(x => x.cur === 'USD') || {}).asOf || null };
+  fs.writeFileSync(path.join(OUT, 'reversal.json'), JSON.stringify({ v: 1, scannedAt: Date.now(), asOf, universe: { KR: U.filter(x => x.cur === 'KRW').length, US: U.filter(x => x.cur === 'USD').length, ok: Object.keys(S).length }, keys: Object.keys(R.PTS), pts: R.PTS, labels: R.LABEL, list: out }));
+  fs.writeFileSync(path.join(OUT, 'revseries.json'), JSON.stringify(series));
+  const st = k => out.filter(x => x.V[DEF] && x.V[DEF][2] === k).length;
+  console.log('결과:', out.length, '종목 | 1단계', st(1), '/ 2단계', st(2), '/ 3단계', st(3), '| NEW', out.filter(x => x.V[DEF] && x.V[DEF][5].length).length, '|', ((Date.now() - t0) / 1000).toFixed(0) + '초');
+  console.log('크기:', (fs.statSync(path.join(OUT, 'reversal.json')).size / 1024).toFixed(0) + 'KB,', (fs.statSync(path.join(OUT, 'revseries.json')).size / 1024).toFixed(0) + 'KB');
+  console.log('상위 5:', out.slice(0, 5).map(x => `${x.n}(${x.V[DEF] && x.V[DEF][0]}점, ${x.V[DEF] && x.V[DEF][2]}단계)`).join(', '));
+})().catch(e => { console.error('스캔 실패:', e); process.exit(1); });

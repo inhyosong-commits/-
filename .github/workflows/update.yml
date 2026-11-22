@@ -24,7 +24,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -61,16 +61,18 @@ jobs:
         continue-on-error: true
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      - name: 숫자 요약·알림 기록을 data 브랜치에 저장
+      - name: 숫자 요약·알림 기록을 data 브랜치에 저장 (다른 파일은 유지)
         continue-on-error: true
         run: |
-          mkdir -p /tmp/snap
-          [ -f snapshot.txt ] && cp snapshot.txt /tmp/snap/
-          [ -f alert-state.json ] && cp alert-state.json /tmp/snap/
-          cd /tmp/snap && [ -n "$(ls)" ] || exit 0
-          git init -q -b data && git config user.name "github-actions" && git config user.email "github-actions@users.noreply.github.com"
-          git add . && git commit -q -m "snapshot"
-          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
+          git clone -q --depth 1 -b data "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" /tmp/data || (mkdir -p /tmp/data && cd /tmp/data && git init -q -b data && git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git")
+          [ -f snapshot.txt ] && cp snapshot.txt /tmp/data/
+          [ -f alert-state.json ] && cp alert-state.json /tmp/data/
+          cd /tmp/data && git config user.name "github-actions" && git config user.email "github-actions@users.noreply.github.com"
+          git checkout -q --orphan fresh && git add -A && git commit -q -m "data" && git push -q -f origin fresh:data
+      - name: 상승 전환 스캔 결과 넣기
+        continue-on-error: true
+        run: |
+          [ -f /tmp/data/reversal.json ] && cp /tmp/data/reversal.json /tmp/data/revseries.json public/ || echo "스캔 결과 아직 없음"
       - id: pages
         uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

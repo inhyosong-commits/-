@@ -1,0 +1,36 @@
+name: 상승 전환 후보 스캔
+
+on:
+  schedule:
+    - cron: '10 7 * * 1-5'    # 한국 장 마감 뒤 (한국시간 16:10)
+    - cron: '40 21 * * 1-5'   # 미국 장 마감 뒤 (한국시간 다음날 06:40)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 스캔 (한국·미국 시총 상위 약 1,600종목)
+        run: node scripts/scan-reversal.js /tmp/scan
+      - name: 결과를 data 브랜치에 저장하고 대시보드 다시 배포
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git clone -q --depth 1 -b data "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" /tmp/data || (mkdir -p /tmp/data && cd /tmp/data && git init -q -b data && git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git")
+          cp /tmp/scan/* /tmp/data/
+          cd /tmp/data && git config user.name "github-actions" && git config user.email "github-actions@users.noreply.github.com"
+          git checkout -q --orphan fresh && git add -A && git commit -q -m "data" && git push -q -f origin fresh:data
+          gh workflow run update.yml --ref main -R "${{ github.repository }}"
