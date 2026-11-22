@@ -28,10 +28,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: 시세 받아오기
+        run: node scripts/fetch-data.js public/market.json "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/market.json"
       - id: pages
         uses: actions/configure-pages@v5
-      - name: 시세 받아오기
-        run: node scripts/fetch-data.js public/market.json "${{ steps.pages.outputs.base_url }}/market.json"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
