@@ -180,6 +180,9 @@ button.sm{font-size:12.5px;padding:4px 10px;min-height:30px;font-weight:500}
 .relx{border-top:1px solid var(--border);padding:8px 0;font-size:12.5px;color:var(--text-secondary)}
 .relx b{color:var(--text-primary);display:block;margin-bottom:2px}
 .bpts{margin:12px 0 0;display:grid;gap:12px}
+.askrow{display:flex;gap:6px;flex-wrap:wrap}
+.askb{display:inline-flex;align-items:center;min-height:40px;padding:8px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);text-decoration:none;font-size:13.5px;font-weight:600;cursor:pointer}
+.askb.pplx{background:#20808d;border-color:#20808d;color:#fff}
 .aitag{font-size:11.5px;color:var(--accent);font-weight:700;margin-top:12px}
 .aih{font-size:18px;font-weight:800;margin:4px 0}
 .ais{margin:0 0 4px;font-size:14px;line-height:1.65}
@@ -253,6 +256,7 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
     <div id="aiRep"></div>
     <div id="bptsWrap"><div class="bpts" id="bpts"></div></div>
     <div class="delta" id="delta"></div>
+    <div class="ask" id="ask"></div>
     <div id="bnews"></div>
   </div>
   <h2 style="margin-top:14px">4개 렌즈 <small>최근 1개월 흐름 기준 점수</small></h2>
@@ -913,7 +917,7 @@ function spark(c){
 function renderRegime(){
   const RG = regime(METRICS), W = worldHeadline(RG, INSIGHTS);
   $('worldH').textContent = W.h;
-  renderDelta(RG); renderBrief(W); renderAI();
+  renderDelta(RG); renderBrief(W); renderAI(); renderAsk();
   $('worldSub').innerHTML = W.sub;
   $('regime').innerHTML = RG.map(r=>{
     if(r.v==null) return `<div class="rtile"><div class="lbl">${r.k}</div><div class="val">–</div></div>`;
@@ -997,7 +1001,8 @@ function drawSector(){
   const why = [tails.length?`순풍: ${tails.map(desc).join(', ')}`:'', heads.length?`역풍: ${heads.map(desc).join(', ')}`:''].filter(Boolean).join(' / ');
   $('sMacro').innerHTML = `<div class="macro">${verdict} ${why?why+'.':''}<br><span class="note">대표 종목 평균: 1일 ${pct(st.d1)} · 1주 ${pct(st.d5)} · 1개월 ${pct(st.m1)}</span>
     <div style="margin-top:8px">${st.drv.map(d=>`<div class="drv" data-sym="${d.s}"><span>${d.label} <span class="note">(${d.sign>0?'오르면 좋음':'내리면 좋음'})</span></span><span class="${dirCls(d.m.m1)}">1개월 ${fmtChg(d.s,d.m.m1)} · <b>${d.eff>=0.5?'순풍':d.eff<=-0.5?'역풍':'중립'}</b></span></div>`).join('')}</div></div>`;
-  $('sNews').innerHTML = newsHtml(mixNews('sec:'+sec.id), 8, sec.name+' 뉴스 (국내·해외)');
+  LAST_PROMPT = sectorPrompt(sec);
+  $('sNews').innerHTML = `<div class="askrow" style="margin-bottom:12px">${askButtons(LAST_PROMPT)}</div>` + newsHtml(mixNews('sec:'+sec.id), 8, sec.name+' 뉴스 (국내·해외)');
   $('sList').innerHTML = sec.stocks.map(([s])=>{
     const m=METRICS[s], meta=META[s], on=PREFS.watch.includes(s);
     if(!m) return `<div class="srow"><div class="nm2">${meta.name}<small>${meta.why}</small></div><div></div><div class="pr note">데이터 없음</div><div></div></div>`;
@@ -1117,6 +1122,45 @@ function computePrev(items){
   const M={}; for(const s of Object.keys(META)){ const m=metrics(s,D[s]); if(m) M[s]=m; }
   return { M, ins: buildInsights(M), rg: regime(M) };
 }
+/* ---- AI에게 물어보기 (API 없이: 내 구독으로 Perplexity/Claude 열기) ---- */
+const ASK_SYMS = ['^GSPC','^IXIC','^KS11','000001.SS','^VIX','HG=F','CL=F','GC=F','NG=F','^TNX','2YY=F','DX-Y.NYB','KRW=X','JPY=X','BTC-USD'];
+function askLines(syms){
+  return syms.filter(s=>METRICS[s]).map(s=>{ const m=METRICS[s]; return `${nm(s)} ${fmtPrice(s,m.last)}${META[s].kind==='yield'?'%':''} (1일 ${fmtChg(s,m.d1)}, 1주 ${fmtChg(s,m.d5)}, 1개월 ${fmtChg(s,m.m1)})`; }).join('\n');
+}
+function askPrompt(){
+  const sig = INSIGHTS.filter(x=>x.level!=='info').slice(0,4).map(x=>'- '+x.title).join('\n');
+  const mine = PREFS.watch.filter(s=>METRICS[s]&&!ASK_SYMS.includes(s)).slice(0,8);
+  return `오늘 세계 경제·시장 상황을 나에게 보고하듯이 쉬운 한국어로 정리해줘. 최신 국내외 뉴스를 검색해서 "왜 그렇게 움직였는지" 설명해줘.
+형식: 1) 한 줄 결론 2) 무슨 일이 있었나 3) 왜 그랬나(뉴스 근거) 4) 한국(코스피·원화·수출기업·물가)에 미치는 영향 5) 앞으로 확인할 일정·지표. 원인은 단정하지 말고, 매수·매도 추천은 하지 마.
+
+[내 대시보드 숫자]
+${askLines(ASK_SYMS)}
+${mine.length?'\n[내 관심종목]\n'+askLines(mine):''}
+[대시보드가 감지한 신호]
+${sig||'- 특별한 급변 신호 없음'}`;
+}
+function sectorPrompt(sec){
+  const st=sectorStats(sec);
+  return `${sec.name} 섹터 상황을 나에게 보고하듯이 쉬운 한국어로 정리해줘. 최신 국내외 뉴스를 검색해서 최근 주가 흐름의 이유, 거시 환경(순풍/역풍), 앞으로 볼 일정을 알려줘. 매수·매도 추천은 하지 마.
+
+[관련 종목]
+${askLines(sec.stocks.map(x=>x[0]))}
+
+[거시 동인]
+${st.drv.map(d=>`${d.label}: 1개월 ${fmtChg(d.s,d.m.m1)} (${d.eff>=0.5?'순풍':d.eff<=-0.5?'역풍':'중립'})`).join('\n')}`;
+}
+function askButtons(prompt){
+  const q=encodeURIComponent(prompt);
+  return `<a class="askb pplx" href="https://www.perplexity.ai/search?q=${q}" target="_blank" rel="noopener noreferrer">Perplexity로 분석 받기</a>
+    <a class="askb" href="https://claude.ai/new?q=${q}" target="_blank" rel="noopener noreferrer">Claude로 분석 받기</a>
+    <button class="askb" data-copy="1">질문 복사</button>`;
+}
+let LAST_PROMPT='';
+function renderAsk(){
+  LAST_PROMPT = askPrompt();
+  $('ask').innerHTML = `<div class="sec" style="margin-top:12px">더 깊이 알고 싶으면</div><div class="askrow">${askButtons(LAST_PROMPT)}</div>
+    <div class="note" style="margin-top:4px">오늘 숫자가 채워진 질문으로 James님 구독 계정에서 열립니다. 추가 비용 없음.</div>`;
+}
 function renderBrief(W){
   const g=s=>METRICS[s]; const M=METRICS;
   const ref = DATA['^GSPC']||DATA['^KS11'];
@@ -1203,6 +1247,8 @@ document.addEventListener('click', e=>{
   const tg=t.closest('[data-tg]'); if(tg){ const s=tg.dataset.tg; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); return; }
   if(t===$('edit')){ $('edit').classList.remove('open'); return; }
   const og=t.closest('[data-open-g]'); if(og){ const d=document.querySelector(`details[data-g="${og.dataset.openG}"]`); if(d) d.open=true; }
+  const cp=t.closest('[data-copy]'); if(cp){ const prompt = $('secm').classList.contains('open') ? sectorPrompt(SECTORS.find(x=>x.id===curSec)) : askPrompt();
+    navigator.clipboard.writeText(prompt).then(()=>{ cp.textContent='복사됨 ✓'; setTimeout(()=>cp.textContent='질문 복사',1500); }).catch(()=>{ cp.textContent='복사 실패'; }); return; }
   const star=t.closest('[data-star]'); if(star){ const s=star.dataset.star; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); return; }
   const so=t.closest('[data-sec-open]'); if(so){ openSector(so.dataset.secOpen); return; }
   if(t===$('secm')){ $('secm').classList.remove('open'); return; }
