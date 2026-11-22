@@ -23,6 +23,14 @@ async function yahoo(q) {
 }
 
 (async () => {
+  const title = String(process.env.Q || '');
+  if (/^\s*알림종목/.test(title)) {
+    const syms = title.replace(/^\s*알림종목\s*[:：]\s*/, '').split(/[,\s]+/).map(x => x.trim()).filter(x => /^[A-Za-z0-9.^=\-]{1,20}$/.test(x)).slice(0, 40);
+    if (!syms.length) return say('알림 받을 종목이 비어 있어요.');
+    const f = path.join(__dirname, '..', 'config', 'alerts.json'), cfg = JSON.parse(fs.readFileSync(f, 'utf8'));
+    cfg.watch = syms; fs.writeFileSync(f, JSON.stringify(cfg, null, 1) + '\n');
+    return say(`✅ 텔레그램 알림 종목을 ${syms.length}개로 바꿨어요. (${syms.join(', ')})`);
+  }
   const q = String(process.env.Q || '').replace(/^\s*종목추가\s*[:：]\s*/, '').trim().slice(0, 40);
   if (!q) return say('종목 이름이나 코드가 비어 있어요.');
   let cands = [];
@@ -39,7 +47,7 @@ async function yahoo(q) {
       if (name === c.sym || /^\d{6}$/.test(name)) { const y = await yahoo(c.sym); if (y[0]) name = y[0].name; }
       list.push({ sym: c.sym, name, unit: UNIT[d.currency] || d.currency || '' });
       fs.writeFileSync(FILE, JSON.stringify(list, null, 1) + '\n');
-      return say(`✅ ${name}(${c.sym})을 추가했어요. 3~5분 뒤 새로고침하고, "내 화면 편집 → 직접 추가한 종목"에서 켜 주세요.`);
+      return say(`✅ 추가했어요: ${name} (${c.sym}). 3~5분 뒤 새로고침하고, "내 화면 편집 → 직접 추가한 종목"에서 켜 주세요.`);
     } catch (_) {}
   }
   say(`"${q}"에 해당하는 종목을 찾지 못했어요. 정확한 이름이나 종목코드(예: 005930, TSLA)로 다시 요청해 주세요.`);

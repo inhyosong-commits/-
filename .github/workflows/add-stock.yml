@@ -1,4 +1,4 @@
-name: 종목 추가 (이슈로 요청)
+name: 종목 추가·알림 종목 설정 (이슈로 요청)
 
 on:
   issues:
@@ -12,7 +12,7 @@ permissions:
 jobs:
   add:
     # 저장소 주인이 연 "종목추가:" 이슈만 처리
-    if: github.event.issue.user.login == github.repository_owner && startsWith(github.event.issue.title, '종목추가')
+    if: github.event.issue.user.login == github.repository_owner && (startsWith(github.event.issue.title, '종목추가') || startsWith(github.event.issue.title, '알림종목'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -31,7 +31,7 @@ jobs:
         run: |
           if ! git diff --quiet config/; then
             git config user.name "github-actions" && git config user.email "github-actions@users.noreply.github.com"
-            git add config/extra-stocks.json && git commit -q -m "종목 추가: $(cat result.txt | head -c 80)" && git push -q
+            git add config/ && git commit -q -m "설정 변경: $(cat result.txt | head -c 80)" && git push -q
             gh workflow run update.yml --ref main
           fi
           gh issue comment "$NUM" --body-file result.txt

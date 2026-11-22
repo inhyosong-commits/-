@@ -378,7 +378,7 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
   <div class="panel" role="dialog" aria-modal="true" aria-label="내 화면 편집">
     <div class="hd"><h3>내 화면 편집</h3><span class="spacer"></span><button id="eReset">기본값으로</button><button id="eClose" class="on">완료</button></div>
     <p class="note">이 기기(브라우저)에만 저장됩니다. 다른 기기로 옮기려면 아래 버튼으로 "설정 링크"를 만들어 그 기기에서 열어 주세요.</p>
-    <div class="askrow" style="margin:6px 0 4px"><button class="askb" id="eShare">다른 기기로 옮기기 (설정 링크 복사)</button></div>
+    <div class="askrow" style="margin:6px 0 4px"><button class="askb" id="eShare">다른 기기로 옮기기 (설정 링크 복사)</button><button class="askb" id="eAlert">이 관심종목으로 텔레그램 알림 받기</button></div>
     <h2>관심종목 순서 <small>맨 위에 이 순서대로 보입니다</small></h2>
     <div id="eWatch"></div>
     <h2>목록에 없는 종목 추가</h2>
@@ -1546,6 +1546,8 @@ $('eShare').onclick=()=>{ const u=cfgLink(), b=$('eShare');
   if(navigator.share){ navigator.share({title:'내 시장 모니터 설정',url:u}).catch(()=>{}); return; }
   navigator.clipboard.writeText(u).then(()=>{ b.textContent='복사됨 ✓ 다른 기기에서 열어 주세요'; setTimeout(()=>b.textContent='다른 기기로 옮기기 (설정 링크 복사)',2500); }).catch(()=>{ b.textContent='복사 실패'; }); };
 checkCfgLink();
+$('eAlert').onclick=()=>{ const w=PREFS.watch.filter(s=>META[s]&&!META[s].derived); const hs=Object.keys(PREFS.hold||{}).filter(s=>!w.includes(s));
+  window.open('https://github.com/inhyosong-commits/-/issues/new?title='+encodeURIComponent('알림종목: '+[...w,...hs].join(','))+'&body='+encodeURIComponent('아래 초록색 Submit new issue 버튼만 누르면 이 종목들로 알림이 설정됩니다.'),'_blank','noopener'); };
 $('addGo').onclick=()=>{ const q=$('addQ').value.trim(); if(!q) return;
   window.open('https://github.com/inhyosong-commits/-/issues/new?title='+encodeURIComponent('종목추가: '+q)+'&body='+encodeURIComponent('아래 초록색 Submit new issue 버튼만 누르면 자동으로 추가됩니다.'),'_blank','noopener'); };
 $('eReset').onclick=()=>{ PREFS=Object.assign(JSON.parse(JSON.stringify(DEFAULT_PREFS)),{hold:PREFS.hold||{}}); applyPrefs(); };

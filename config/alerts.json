@@ -1,0 +1,6 @@
+{
+ "watch": ["^KS11", "^GSPC", "KRW=X", "HG=F", "CL=F", "GC=F", "^TNX", "005930.KS", "000660.KS", "NVDA"],
+ "stockMove": 5,
+ "macroZ": 2.5,
+ "morningKST": 7
+}
