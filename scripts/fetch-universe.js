@@ -14,7 +14,7 @@ async function korea() {
       const list = d.stocks || [];
       if (page === 1 && mkt === 'KOSPI') console.log('한국 예시:', JSON.stringify(list[0] || d).slice(0, 400));
       for (const x of list) {
-        if (!/^\d{6}$/.test(x.itemCode || '') || x.stockEndType && x.stockEndType !== 'stock') continue;
+        if (!/^[0-9A-Z]{6}$/.test(x.itemCode || '')) continue;
         out.push([x.itemCode + (mkt === 'KOSDAQ' ? '.KQ' : '.KS'), x.stockName, num(x.closePrice), num(x.fluctuationsRatio)]);
       }
       if (list.length < 100) break;
@@ -31,6 +31,12 @@ async function usa() {
     .filter(x => x[0] && x[2] && (x[4] || 0) >= 2e8).sort((a, b) => (b[4] || 0) - (a[4] || 0)).map(x => x.slice(0, 4));
 }
 
+async function usEtf() {
+  const d = await j('https://api.nasdaq.com/api/screener/etf?tableonly=true&limit=10000&offset=0&download=true', { Origin: 'https://www.nasdaq.com', Referer: 'https://www.nasdaq.com/' });
+  const rows = (d.data && (d.data.rows || (d.data.data && d.data.data.rows) || (d.data.table && d.data.table.rows))) || [];
+  console.log('미국 ETF 예시:', JSON.stringify(rows[0] || d).slice(0, 300));
+  return rows.map(x => [String(x.symbol || '').trim(), String(x.companyName || x.name || '').trim(), num(x.lastSalePrice || x.lastsale), num(x.percentageChange || x.pctchange)]).filter(x => x[0] && x[2]);
+}
 (async () => {
   const out = process.argv[2] || 'public/universe.json', prevUrl = process.argv[3];
   let prev = null;
@@ -38,6 +44,7 @@ async function usa() {
   const res = { fetchedAt: Date.now(), kr: [], us: [] };
   try { res.kr = await korea(); } catch (e) { console.log('한국 목록 실패:', e.message); if (prev) res.kr = prev.kr || []; }
   try { res.us = await usa(); } catch (e) { console.log('미국 목록 실패:', e.message); if (prev) res.us = prev.us || []; }
+  try { const e = await usEtf(); const have = new Set(res.us.map(x => x[0])); for (const x of e) if (!have.has(x[0])) res.us.push(x); console.log('미국 ETF', e.length); } catch (e) { console.log('미국 ETF 실패:', e.message); }
   console.log('종목 목록: 한국', res.kr.length, '/ 미국', res.us.length);
   fs.writeFileSync(out, JSON.stringify(res));
   console.log('크기', (fs.statSync(out).size / 1024).toFixed(0) + 'KB');

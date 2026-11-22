@@ -37,7 +37,11 @@ nav.sec::-webkit-scrollbar{display:none}
 .tabs{display:flex;gap:4px;margin:0 0 8px;background:var(--surface-2);border-radius:10px;padding:3px}
 .tabs button{flex:1;min-height:36px;border:0;border-radius:8px;background:none;color:var(--text-secondary);font-size:14px;font-weight:600;cursor:pointer}
 .tabs button.on{background:var(--surface-1);color:var(--text-primary);box-shadow:0 1px 3px rgba(0,0,0,.15)}
-body.pick nav.sec, body.pick #tab-mkt, body.cal nav.sec, body.cal #tab-mkt{display:none} body:not(.pick) #tab-pick{display:none} body:not(.cal) #tab-cal{display:none}
+body.pick nav.sec, body.pick #tab-mkt, body.cal nav.sec, body.cal #tab-mkt, body.hold nav.sec, body.hold #tab-mkt{display:none} body:not(.pick) #tab-pick{display:none} body:not(.cal) #tab-cal{display:none} body:not(.hold) #tab-hold{display:none}
+.tabs button{font-size:13.5px;white-space:nowrap;padding:0 4px}
+#hSearch{width:100%;min-height:44px;padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary);font-size:16px;box-sizing:border-box}
+.sres{margin-top:6px} .sres .r{display:flex;align-items:center;gap:8px;padding:10px 6px;border-bottom:1px solid var(--border);cursor:pointer} .sres .r .n{flex:1;min-width:0} .sres .r small{color:var(--text-muted);margin-left:4px}
+.hrow2{padding:12px 2px;border-top:1px solid var(--border)} .hrow2 .a{display:flex;justify-content:space-between;gap:8px;align-items:baseline} .hrow2 .nmh{font-weight:600;font-size:15px;cursor:pointer} .hrow2 .b{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 10px;font-size:12.5px;color:var(--text-secondary);margin-top:4px;font-variant-numeric:tabular-nums} .hrow2 .b span{white-space:nowrap} .hrow2 .btns{margin-top:6px;display:flex;gap:6px}
 .cday{margin:14px 0 4px;font-size:13px;font-weight:700;color:var(--text-secondary)} .cday b{color:var(--st-warn);margin-left:6px}
 .crow{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;padding:10px 12px;background:var(--surface-1);border:1px solid var(--border);border-radius:12px;margin:6px 0}
 .crow .ct{font-weight:600;font-size:14.5px} .crow .cw{font-size:12.5px;color:var(--text-secondary);margin-top:3px;line-height:1.45}
@@ -277,7 +281,7 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
     <button id="theme" title="밝게/어둡게" aria-label="밝게/어둡게">◐</button>
   </div>
   <div class="note" id="updated" style="margin:-4px 0 6px"></div>
-  <div class="tabs" role="tablist"><button data-tab="mkt" class="on">시장 보기</button><button data-tab="pick">종목 고르기</button><button data-tab="cal">일정</button></div>
+  <div class="tabs" role="tablist"><button data-tab="mkt" class="on">시장</button><button data-tab="pick">종목 발굴</button><button data-tab="cal">일정</button><button data-tab="hold">내 보유</button></div>
   <nav class="sec" id="secnav"></nav>
 </header>
 <div id="cfgBanner"></div>
@@ -285,6 +289,11 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
   <div id="tab-pick">
     <div class="disc"><b>추천이 아니라 "살펴볼 후보"예요.</b> 지금의 거시 환경(금리·환율·원자재 흐름)과 주가 흐름만 보고 기계적으로 분류했습니다. 회사 실적, 가격 수준(비싼지 싼지), 내 상황은 반영하지 않았어요. 투자 결정은 꼭 직접 확인하고 내려 주세요.</div>
     <div id="pick"></div>
+  </div>
+  <div id="tab-hold">
+    <div class="pbox" style="margin-top:6px"><h3>종목 검색해서 등록</h3><p class="pd">한국·미국 상장 종목 이름이나 코드로 찾아서 수량과 평단가를 넣으세요. 이 기기에만 저장돼요.</p>
+      <input id="hSearch" type="search" placeholder="예: 삼성전자, 005930, 테슬라, TSLA" autocomplete="off"><div class="sres" id="hRes"></div><div id="hForm"></div></div>
+    <div id="holdList"></div>
   </div>
   <div id="tab-cal">
     <div class="filters" id="calF"></div>
@@ -1100,7 +1109,7 @@ function drawSector(){
 }
 /* ---- 종목 고르기 탭 ---- */
 function setTab(t){
-  document.body.classList.toggle('pick', t==='pick'); document.body.classList.toggle('cal', t==='cal');
+  ['pick','cal','hold'].forEach(k=>document.body.classList.toggle(k, t===k)); if(t==='hold') loadUniverse();
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===t));
   try{ localStorage.setItem('cmTab', t); }catch(_){}
   window.scrollTo(0,0);
@@ -1307,7 +1316,7 @@ function renderCal(){
 }
 function renderAll(){
   if(!Object.keys(METRICS).length) return;
-  renderWatch(); renderRegime(); renderInsights(); renderSectors(); renderGroups(); renderPick(); renderCal();
+  renderWatch(); renderRegime(); renderInsights(); renderSectors(); renderGroups(); renderPick(); renderCal(); renderHold();
   if(curSec&&$('secm').classList.contains('open')) drawSector();
   const sig=INSIGHTS.filter(x=>x.level!=='info');
   $('fTopSum').innerHTML = sig.length? `<b style="color:var(--st-serious)">${sig.length}개</b> · ${esc(sig[0].title)}` : '특별한 신호 없음';
@@ -1317,23 +1326,104 @@ function renderAll(){
   for(const [id] of SECTIONS){ const el=$(id); if(el) el.style.display=isHidden(id)?'none':''; }
 }
 /* ---- 내 보유 종목 ---- */
-function fxOf(s){ const u=META[s]&&META[s].unit; if(u==='₩') return 1; if(u==='$') return METRICS['KRW=X']?METRICS['KRW=X'].last:null; if(u==='€') return METRICS['KRWEUR']?METRICS['KRWEUR'].last:null; return null; }
+let UNI=null, UNIMAP={}, uniLoading=null;
+function loadUniverse(){
+  if(uniLoading) return uniLoading;
+  uniLoading=(async()=>{ try{ const r=await fetch('universe.json?t='+Math.floor(Date.now()/600000),{cache:'no-store'}); if(r.ok){ UNI=await r.json(); UNIMAP={}; for(const x of UNI.kr||[]) UNIMAP[x[0]]=x; for(const x of UNI.us||[]) UNIMAP[x[0]]=x; renderHold(); renderAcct(); } }catch(_){} })();
+  return uniLoading;
+}
+const isKr = s=>/\.K[SQ]$/.test(s);
+const unitOf = s=> META[s]? META[s].unit : isKr(s)? '₩' : '$';
+function fxU(u){ if(u==='₩') return 1; if(u==='$') return METRICS['KRW=X']?METRICS['KRW=X'].last:null; if(u==='€') return METRICS['KRWEUR']?METRICS['KRWEUR'].last:null; return null; }
+function fxOf(s){ return fxU(unitOf(s)); }
+function qOf(s){
+  const m=METRICS[s]; if(m) return {last:m.last, prev:m.prev, name:META[s].name};
+  const u=UNIMAP[s]; if(u&&u[2]) return {last:u[2], prev:u[3]!=null? u[2]/(1+u[3]/100) : null, name:u[1]};
+  return null;
+}
 const won = x=> (x<0?'-':'')+'₩'+Math.round(Math.abs(x)).toLocaleString('ko-KR');
 const swon = x=> (x>0?'+':'')+won(x);
+const hBadge = s=> `<span class="mk ${isKr(s)?'kr':META[s]?mkOf(s):'us'}">${isKr(s)?'국장':(META[s]&&mkOf(s)==='ov')?'해외':'미장'}</span>`;
+function holdRows(){
+  const rows=[];
+  for(const [s,h] of Object.entries(PREFS.hold||{})){ if(!(h.q>0)) continue; const q=qOf(s), fx=fxOf(s);
+    const name=(q&&q.name)||h.name||s;
+    if(!q||!fx){ rows.push({s,h,name,val:null}); continue; }
+    rows.push({s,h,name,q,fx,val:h.q*q.last*fx, cost:h.p>0?h.q*h.p*fx:null, today:q.prev?h.q*(q.last-q.prev)*fx:0}); }
+  return rows;
+}
+function acctSummary(rows){
+  const ok=rows.filter(r=>r.val!=null), val=ok.reduce((a,r)=>a+r.val,0), today=ok.reduce((a,r)=>a+r.today,0), cr=ok.filter(r=>r.cost), cost=cr.reduce((a,r)=>a+r.cost,0), gain=cr.reduce((a,r)=>a+r.val-r.cost,0);
+  return {ok,val,today,cost,gain};
+}
 function renderAcct(){
-  const H=PREFS.hold||{}, rows=[];
-  for(const [s,h] of Object.entries(H)){ const m=METRICS[s], fx=fxOf(s); if(!m||!fx||!(h.q>0)) continue;
-    const val=h.q*m.last*fx, cost=h.p>0?h.q*h.p*fx:null, today=h.q*(m.last-m.prev)*fx;
-    rows.push({s,h,val,cost,today}); }
-  if(!rows.length){ $('acct').innerHTML = `<div class="note" style="margin:0 0 8px">💡 종목을 눌러 <b>보유 수량과 평단가</b>를 넣으면 여기서 내 수익률과 오늘 손익을 볼 수 있어요. (이 기기에만 저장)</div>`; return; }
-  const sum=k=>rows.reduce((a,r)=>a+(r[k]||0),0), val=sum('val'), today=sum('today'), costRows=rows.filter(r=>r.cost), cost=costRows.reduce((a,r)=>a+r.cost,0), gain=costRows.reduce((a,r)=>a+r.val-r.cost,0);
-  rows.sort((a,b)=>b.val-a.val);
-  $('acct').innerHTML = `<div class="acct"><div class="k">내 계좌 · 원화 환산 (이 기기에만 저장)</div>
-    <div class="top"><span class="big">${won(val)}</span>
-    <span><span class="k">오늘</span> <span class="v ${dirCls(today)}">${swon(today)} (${pct(today/(val-today)*100)})</span></span>
-    ${cost?`<span><span class="k">총 손익</span> <span class="v ${dirCls(gain)}">${swon(gain)} (${pct(gain/cost*100)})</span></span>`:''}</div>
-    <table>${rows.map(r=>`<tr data-sym="${r.s}"><td>${mkBadge(r.s)}${nm(r.s)}</td><td class="${dirCls(r.today)}">${swon(r.today)}</td><td class="${r.cost?dirCls(r.val-r.cost):''}">${r.cost?pct((r.val/r.cost-1)*100):'–'}</td><td>${Math.round(r.val/val*100)}%</td></tr>`).join('')}</table>
-    <div class="note" style="margin-top:6px">오늘 · 수익률 · 비중 순. 해외 종목은 현재 환율로 환산해서 환율 변동 손익은 빠져 있어요.</div></div>`;
+  const rows=holdRows(); if(!rows.length){ $('acct').innerHTML=''; return; }
+  const S=acctSummary(rows); if(!S.ok.length){ $('acct').innerHTML=''; return; }
+  $('acct').innerHTML = `<div class="acct" data-tab="hold" style="cursor:pointer"><div class="k">내 계좌 (원화 환산) · 눌러서 자세히</div><div class="top"><span class="big">${won(S.val)}</span>
+    <span><span class="k">오늘</span> <span class="v ${dirCls(S.today)}">${swon(S.today)} (${pct(S.today/(S.val-S.today)*100)})</span></span>
+    ${S.cost?`<span><span class="k">총 손익</span> <span class="v ${dirCls(S.gain)}">${swon(S.gain)} (${pct(S.gain/S.cost*100)})</span></span>`:''}</div></div>`;
+}
+const KO_ALIAS = {'테슬라':'TSLA','애플':'AAPL','엔비디아':'NVDA','마이크로소프트':'MSFT','마소':'MSFT','아마존':'AMZN','구글':'GOOGL','알파벳':'GOOGL','메타':'META','페이스북':'META','넷플릭스':'NFLX','팔란티어':'PLTR','에이엠디':'AMD','브로드컴':'AVGO','퀄컴':'QCOM','인텔':'INTC','마이크론':'MU','티에스엠씨':'TSM','대만반도체':'TSM','코카콜라':'KO','디즈니':'DIS','나이키':'NKE','스타벅스':'SBUX','맥도날드':'MCD','버크셔':'BRK-B','제이피모건':'JPM','JP모건':'JPM','비자':'V','마스터카드':'MA','일라이릴리':'LLY','릴리':'LLY','노보노디스크':'NVO','화이자':'PFE','모더나':'MRNA','아이온큐':'IONQ','리게티':'RGTI','코인베이스':'COIN','마이크로스트래티지':'MSTR','스트래티지':'MSTR','로블록스':'RBLX','우버':'UBER','에어비앤비':'ABNB','쇼피파이':'SHOP','오라클':'ORCL','세일즈포스':'CRM','어도비':'ADBE','월마트':'WMT','코스트코':'COST','보잉':'BA','록히드마틴':'LMT','엑슨모빌':'XOM','셰브론':'CVX','리비안':'RIVN','루시드':'LCID','소파이':'SOFI','슈퍼마이크로':'SMCI','암홀딩스':'ARM','델':'DELL','스노우플레이크':'SNOW','크라우드스트라이크':'CRWD','알리바바':'BABA','페이팔':'PYPL','버티브':'VRT','비스트라':'VST','컨스텔레이션':'CEG','오클로':'OKLO','로켓랩':'RKLB','유나이티드헬스':'UNH','존슨앤드존슨':'JNJ','프록터앤드갬블':'PG','펩시':'PEP','에이에스엠엘':'ASML','ASML':'ASML','쿠팡':'CPNG','큐큐큐':'QQQ','나스닥100':'QQQ','에스앤피500':'SPY','S&P500':'VOO','슈드':'SCHD','티큐큐큐':'TQQQ','속슬':'SOXL','삭슬':'SOXL','미국채':'TLT'};
+let hPick=null;
+function renderSearch(){
+  const q=$('hSearch').value.trim(), box=$('hRes');
+  if(!q){ box.innerHTML=''; return; }
+  if(!UNI){ box.innerHTML='<p class="note">종목 목록을 불러오는 중…</p>'; loadUniverse(); return; }
+  const ql=q.toLowerCase(), all=[];
+  const add=(sym,name,price,chg,score)=>{ if(!all.some(x=>x.sym===sym)) all.push({sym,name,price,chg,score}); };
+  for(const src of [UNI.kr||[], UNI.us||[]]) for(const [sym,name,price,chg] of src){
+    const n=(name||'').toLowerCase(), c=sym.toLowerCase().replace(/\.k[sq]$/,'');
+    let sc=0; if(c===ql||sym.toLowerCase()===ql) sc=100; else if(n===ql) sc=90; else if(n.startsWith(ql)) sc=70; else if(c.startsWith(ql)) sc=60; else if(n.includes(ql)) sc=40;
+    if(sc) add(sym,name,price,chg,sc - (src===UNI.us&&/[가-힣]/.test(q)?50:0));
+  }
+  for(const [k,sym] of Object.entries(KO_ALIAS)) if(k.toLowerCase().includes(ql)||(ql.length>=2&&ql.includes(k.toLowerCase()))){ const u=UNIMAP[sym]; if(u) add(sym,u[1]+' ('+k+')',u[2],u[3],k.toLowerCase()===ql?98:75); }
+  for(const m of Object.values(META)) if(m.stock&&(m.name.toLowerCase().includes(ql)||m.sym.toLowerCase().startsWith(ql))){ const x=METRICS[m.sym]; add(m.sym,m.name,x&&x.last,x&&x.d1,m.name.toLowerCase()===ql?95:65); }
+  all.sort((a,b)=>b.score-a.score);
+  const top=all.slice(0,15);
+  box.innerHTML = top.length? top.map(x=>`<div class="r" data-hpick="${esc(x.sym)}" data-hname="${esc(x.name)}">${hBadge(x.sym)}<span class="n">${esc(x.name)}<small>${esc(x.sym.replace(/\.K[SQ]$/,''))}</small></span><span class="${dirCls(x.chg)}" style="font-variant-numeric:tabular-nums;font-size:13px">${x.price!=null?(isKr(x.sym)?Math.round(x.price).toLocaleString('ko-KR'):x.price.toLocaleString('en-US',{maximumFractionDigits:2})):''}${x.chg!=null?` ${pct(x.chg)}`:''}</span></div>`).join('')
+    : `<p class="note">"${esc(q)}"에 맞는 종목이 없어요. 한국 종목은 6자리 코드, 미국 종목은 티커(예: AAPL)로도 찾을 수 있어요.</p>`;
+}
+function openHoldForm(sym,name){
+  hPick=sym; const h=(PREFS.hold||{})[sym]||{};
+  $('hRes').innerHTML='';
+  $('hForm').innerHTML=`<div class="hold">${hBadge(sym)}<b>${esc(name)}</b> <span class="note">${esc(sym)}</span><br>
+    <label>수량 <input id="hfQ" type="number" inputmode="decimal" min="0" step="any" value="${h.q||''}" placeholder="0"></label>
+    <label>평단가(${unitOf(sym)}) <input id="hfP" type="number" inputmode="decimal" min="0" step="any" value="${h.p||''}" placeholder="선택"></label>
+    <div class="askrow" style="margin-top:6px"><button class="askb pplx" id="hfSave">저장</button><button class="askb" id="hfCancel">취소</button></div></div>`;
+  $('hfSave').onclick=()=>{ const q=parseFloat($('hfQ').value), p=parseFloat($('hfP').value); PREFS.hold=PREFS.hold||{};
+    if(q>0) PREFS.hold[sym]={q,p:p>0?p:0,name}; else delete PREFS.hold[sym];
+    $('hForm').innerHTML=''; $('hSearch').value=''; applyPrefs(); };
+  $('hfCancel').onclick=()=>{ $('hForm').innerHTML=''; };
+  setTimeout(()=>{ const i=$('hfQ'); if(i) i.focus(); },50);
+}
+function renderHold(){
+  const el=$('holdList'); if(!el) return;
+  const rows=holdRows();
+  if(!rows.length){ el.innerHTML=`<p class="note" style="margin:12px 2px">아직 등록한 종목이 없어요. 위에서 검색해서 추가해 보세요.</p>`; return; }
+  const S=acctSummary(rows);
+  rows.sort((a,b)=>(b.val||0)-(a.val||0));
+  const fmtP=(s,x)=> x==null?'–': isKr(s)? Math.round(x).toLocaleString('ko-KR')+'원' : unitOf(s)+x.toLocaleString('en-US',{maximumFractionDigits:2});
+  const kr=S.ok.filter(r=>isKr(r.s)).reduce((a,r)=>a+r.val,0);
+  el.innerHTML = `<div class="acct"><div class="k">내 계좌 · 원화 환산</div><div class="top"><span class="big">${won(S.val)}</span>
+    <span><span class="k">오늘</span> <span class="v ${dirCls(S.today)}">${swon(S.today)} (${pct(S.val>S.today?S.today/(S.val-S.today)*100:0)})</span></span>
+    ${S.cost?`<span><span class="k">총 손익</span> <span class="v ${dirCls(S.gain)}">${swon(S.gain)} (${pct(S.gain/S.cost*100)})</span></span>`:''}</div>
+    <div class="note" style="margin-top:6px">국장 ${S.val?Math.round(kr/S.val*100):0}% · 해외 ${S.val?100-Math.round(kr/S.val*100):0}%</div>
+    ${rows.map(r=>`<div class="hrow2"><div class="a"><span class="nmh" ${META[r.s]?`data-sym="${r.s}"`:''}>${hBadge(r.s)}${esc(r.name)}</span><b>${r.val!=null?won(r.val):'시세 없음'}</b></div>
+      <div class="b"><span>${r.h.q.toLocaleString('ko-KR')}주 · 평단 ${r.h.p?fmtP(r.s,r.h.p):'–'} · 지금 ${r.q?fmtP(r.s,r.q.last):'–'}</span></div>
+      ${r.val!=null?`<div class="b"><span>오늘 <b class="${dirCls(r.today)}">${swon(r.today)}</b></span><span>수익률 <b class="${r.cost?dirCls(r.val-r.cost):''}">${r.cost?pct((r.val/r.cost-1)*100)+' ('+swon(r.val-r.cost)+')':'평단 미입력'}</b></span><span>비중 ${Math.round(r.val/S.val*100)}%</span></div>`:''}
+      <div class="btns"><button class="sm" data-hedit="${esc(r.s)}">수정</button><button class="sm" data-hdel="${esc(r.s)}">삭제</button>${META[r.s]?`<button class="sm" data-sym="${r.s}">차트</button>`:''}</div></div>`).join('')}
+    <div class="note" style="margin-top:8px">해외 종목은 현재 환율로 환산해서 환율 변동 손익은 빠져 있어요. 대시보드 기본 종목이 아니면 차트 없이 현재가만 보여요 (15분마다 갱신).</div></div>
+    <div class="pbox"><h3>내 보유 종목 AI 점검</h3><p class="pd">보유 종목과 비중을 넣은 질문으로 열려요. 각 종목의 최근 이슈, 다가오는 일정, 지금 시장 환경에서 유리한지/불리한지, 한쪽에 너무 몰려 있지 않은지 봐 줘요.</p><div class="askrow">${askButtons(holdPrompt(rows,S),'hold')}</div></div>`;
+}
+function holdPrompt(rows,S){
+  rows=rows||holdRows(); S=S||acctSummary(rows);
+  return `내가 가진 주식들을 점검해줘. 최신 국내외 뉴스를 검색해서 알려줘.
+[보유 종목] (비중, 수익률)
+${S.ok.map(r=>`- ${r.name} (${r.s}): 비중 ${Math.round(r.val/S.val*100)}%, ${r.cost?'수익률 '+pct((r.val/r.cost-1)*100):'평단 미입력'}`).join('\n')}
+
+종목마다: ① 최근 주가가 움직인 이유 ② 다가오는 일정(실적, 신제품, 임상 등)과 결과에 따른 영향 ③ 지금 금리·환율·경기 흐름에서 유리한지 불리한지 (화살표로).
+마지막에: 내 보유 종목이 한 업종·한 나라에 너무 몰려 있는지, 같이 떨어질 위험이 큰 조합이 있는지.
+전문 용어는 풀어서 친구에게 말하듯 쉽게. 매수·매도 추천은 하지 마.`;
 }
 function holdForm(sym){
   const meta=META[sym]; if(!meta||!meta.stock) return '';
@@ -1439,7 +1529,7 @@ function drawModal(){
     ['52주 고/저',fmtPrice(sym,m.hi)+' / '+fmtPrice(sym,m.lo)],['50일선 대비',meta.kind==='pct'?pct(m.vsMa50):fmtChg(sym,m.vsMa50)],['오늘 움직임 강도',(m.z1==null?'–':Math.abs(m.z1).toFixed(1)+'σ')],['연 변동성',meta.kind==='pct'?m.volAnn.toFixed(1)+'%':meta.kind==='yield'?Math.round(m.volAnn*100)+'bp':m.volAnn.toFixed(2)]];
   $('mStats').innerHTML = st.map(([a,b])=>`<div>${a}<b>${b}</b></div>`).join('');
   $('mHold').innerHTML = flowHtml(sym) + holdForm(sym);
-  if($('hSave')) $('hSave').onclick=()=>{ const q=parseFloat($('hQ').value), p=parseFloat($('hP').value); PREFS.hold=PREFS.hold||{}; if(q>0){ PREFS.hold[sym]={q,p:p>0?p:0}; if(!PREFS.watch.includes(sym)) PREFS.watch.push(sym); } else delete PREFS.hold[sym]; applyPrefs(); drawModal(); };
+  if($('hSave')) $('hSave').onclick=()=>{ const q=parseFloat($('hQ').value), p=parseFloat($('hP').value); PREFS.hold=PREFS.hold||{}; if(q>0){ PREFS.hold[sym]={q,p:p>0?p:0,name:META[sym].name}; if(!PREFS.watch.includes(sym)) PREFS.watch.push(sym); } else delete PREFS.hold[sym]; applyPrefs(); drawModal(); };
   if($('hDel')) $('hDel').onclick=()=>{ delete PREFS.hold[sym]; applyPrefs(); drawModal(); };
   const rel = INSIGHTS.filter(x=>x.syms.includes(sym));
   const nws = newsHtml(newsFor(sym), 5, '관련 뉴스');
@@ -1619,6 +1709,7 @@ async function refresh(){
   renderAll();
   if(curSym) drawModal();
   translateMissing();
+  if(Object.keys(PREFS.hold||{}).some(s=>!META[s])) loadUniverse();
   $('refresh').disabled=false; busy=false;
 }
 
@@ -1631,8 +1722,11 @@ document.addEventListener('click', e=>{
   if(t===$('edit')){ $('edit').classList.remove('open'); return; }
   const of=t.closest('[data-open-f]'); if(of){ const d=document.querySelector(`details[data-g="${of.dataset.openF}"]`); if(d) d.open=true; }
   const og=t.closest('[data-open-g]'); if(og){ const d=document.querySelector(`details[data-g="${og.dataset.openG}"]`); if(d) d.open=true; }
-  const cp=t.closest('[data-copy]'); if(cp){ const prompt = cp.dataset.copy==='pick' ? pickPrompt() : cp.dataset.copy==='cal' ? calPrompt() : $('secm').classList.contains('open') ? sectorPrompt(SECTORS.find(x=>x.id===curSec)) : askPrompt();
+  const cp=t.closest('[data-copy]'); if(cp){ const prompt = cp.dataset.copy==='hold' ? holdPrompt() : cp.dataset.copy==='pick' ? pickPrompt() : cp.dataset.copy==='cal' ? calPrompt() : $('secm').classList.contains('open') ? sectorPrompt(SECTORS.find(x=>x.id===curSec)) : askPrompt();
     navigator.clipboard.writeText(prompt).then(()=>{ cp.textContent='복사됨 ✓'; setTimeout(()=>cp.textContent='질문 복사',1500); }).catch(()=>{ cp.textContent='복사 실패'; }); return; }
+  const hp=t.closest('[data-hpick]'); if(hp){ openHoldForm(hp.dataset.hpick, hp.dataset.hname); return; }
+  const he=t.closest('[data-hedit]'); if(he){ const s=he.dataset.hedit, h=PREFS.hold[s]; const q=qOf(s); openHoldForm(s,(q&&q.name)||h.name||s); window.scrollTo(0,0); return; }
+  const hd=t.closest('[data-hdel]'); if(hd){ delete PREFS.hold[hd.dataset.hdel]; applyPrefs(); return; }
   const pm=t.closest('[data-pmk]'); if(pm){ pickMkt=pm.dataset.pmk; try{localStorage.setItem('cmPickMkt',pickMkt);}catch(_){} renderPick(); return; }
   const cf=t.closest('[data-calf]'); if(cf){ calMine=cf.dataset.calf==='mine'; renderCal(); return; }
   const tb=t.closest('[data-tab]'); if(tb){ setTab(tb.dataset.tab); return; }
@@ -1648,7 +1742,7 @@ document.addEventListener('click', e=>{
 document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ if($('modal').classList.contains('open')) closeModal(); else { $('edit').classList.remove('open'); $('secm').classList.remove('open'); } } if(e.key==='Enter'&&e.target.dataset&&e.target.dataset.sym) openModal(e.target.dataset.sym); });
 $('mClose').onclick=closeModal;
 $('mStar').onclick=()=>{ const s=curSym; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); drawModal(); };
-try{ const tb0=location.hash==='#pick'?'pick':location.hash==='#cal'?'cal':localStorage.getItem('cmTab'); if(tb0==='pick'||tb0==='cal') setTab(tb0); }catch(_){}
+try{ const tb0=['#pick','#cal','#hold'].includes(location.hash)?location.hash.slice(1):localStorage.getItem('cmTab'); if(tb0==='pick'||tb0==='cal'||tb0==='hold') setTab(tb0); }catch(_){}
 $('editBtn').onclick=()=>{ renderEdit(); $('edit').classList.add('open'); };
 $('sClose').onclick=()=>$('secm').classList.remove('open');
 $('eClose').onclick=()=>$('edit').classList.remove('open');
@@ -1656,6 +1750,7 @@ $('eShare').onclick=()=>{ const u=cfgLink(), b=$('eShare');
   if(navigator.share){ navigator.share({title:'내 시장 모니터 설정',url:u}).catch(()=>{}); return; }
   navigator.clipboard.writeText(u).then(()=>{ b.textContent='복사됨 ✓ 다른 기기에서 열어 주세요'; setTimeout(()=>b.textContent='다른 기기로 옮기기 (설정 링크 복사)',2500); }).catch(()=>{ b.textContent='복사 실패'; }); };
 checkCfgLink();
+$('hSearch').addEventListener('input', renderSearch);
 $('eAlert').onclick=()=>{ const w=PREFS.watch.filter(s=>META[s]&&!META[s].derived); const hs=Object.keys(PREFS.hold||{}).filter(s=>!w.includes(s));
   window.open('https://github.com/inhyosong-commits/-/issues/new?title='+encodeURIComponent('알림종목: '+[...w,...hs].join(','))+'&body='+encodeURIComponent('아래 초록색 Submit new issue 버튼만 누르면 이 종목들로 알림이 설정됩니다.'),'_blank','noopener'); };
 $('addGo').onclick=()=>{ const q=$('addQ').value.trim(); if(!q) return;
