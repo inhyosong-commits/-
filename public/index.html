@@ -62,7 +62,7 @@ h2 small{font-weight:400;color:var(--text-muted);font-size:12px}
 .meter i{position:absolute;top:0;height:6px;border-radius:3px}
 .meter b{position:absolute;left:50%;top:-3px;width:1px;height:12px;background:var(--text-muted)}
 .rtile .lbl{font-size:14px;font-weight:700;color:var(--text-primary);display:flex;justify-content:space-between;margin-bottom:8px}
-.rtile .sc{font-variant-numeric:tabular-nums;font-weight:600;color:var(--text-secondary)}
+.rtile .scr{font-variant-numeric:tabular-nums;font-weight:600;color:var(--text-secondary)}
 .rline{font-size:13px;margin-top:8px;line-height:1.4}
 .parts{display:flex;flex-wrap:wrap;gap:4px 8px;margin-top:6px;font-size:11.5px}
 .parts span{cursor:pointer}
@@ -179,6 +179,15 @@ button.sm{font-size:12.5px;padding:4px 10px;min-height:30px;font-weight:500}
 .rel summary::-webkit-details-marker{display:none}
 .relx{border-top:1px solid var(--border);padding:8px 0;font-size:12.5px;color:var(--text-secondary)}
 .relx b{color:var(--text-primary);display:block;margin-bottom:2px}
+.bpts{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:7px}
+.bpts li{display:grid;grid-template-columns:64px minmax(0,1fr);gap:8px;font-size:13.5px;line-height:1.5}
+.bpts .bk{font-size:12px;color:var(--text-muted);font-weight:600;padding-top:1px}
+.news{list-style:none;padding:0;margin:4px 0 0}
+.news li{padding:7px 0;border-top:1px solid var(--border);font-size:13.5px;line-height:1.45}
+.news li:first-child{border-top:0}
+.news a{color:var(--text-primary);text-decoration:none}
+.news a:hover{text-decoration:underline}
+.news span{display:block;font-size:11.5px;color:var(--text-muted);margin-top:2px}
 .delta{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:13px;color:var(--text-secondary);line-height:1.6}
 .delta b{color:var(--text-primary)}
 .empty{color:var(--text-muted);font-size:13px;padding:10px;border:1px dashed var(--border);border-radius:10px}
@@ -232,11 +241,14 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
 <main>
   <section id="s-world">
   <div class="world">
-    <div class="wl">오늘의 세계 <span class="note">최근 1개월 흐름 기준</span></div>
+    <div class="wl" id="briefDate">오늘의 브리핑</div>
     <div class="wh" id="worldH">…</div>
     <div class="ws" id="worldSub"></div>
+    <ul class="bpts" id="bpts"></ul>
     <div class="delta" id="delta"></div>
+    <div id="bnews"></div>
   </div>
+  <h2 style="margin-top:14px">4개 렌즈 <small>최근 1개월 흐름 기준 점수</small></h2>
   <div class="regime" id="regime"></div>
   <details class="guide"><summary>조합해서 읽는 법 ▾</summary>
     <table class="tbl gtbl">
@@ -299,6 +311,7 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
     <div id="sMacro"></div>
     <h2>관련 종목 <small>눌러서 차트 · ☆로 관심종목 추가</small></h2>
     <div id="sList"></div>
+    <div id="sNews" style="margin-top:14px"></div>
   </div>
 </div>
 
@@ -429,6 +442,32 @@ const SECTORS = [
    drivers:[['^IXIC',1,'나스닥'],['^TNX',-1,'미 10년물 금리']],
    stocks:[['035420.KS','NAVER'],['035720.KS','카카오'],['MSFT','마이크로소프트'],['GOOGL','알파벳'],['META','메타']]},
 ];
+/*NEWS-TOPICS*/
+const NEWS_TOPICS = {
+  "HG=F":"구리 가격","ALI=F":"알루미늄 가격","CL=F":"국제유가","BZ=F":"브렌트유 유가","NG=F":"천연가스 가격","GC=F":"국제 금값","SI=F":"은 가격 은값",
+  "ZW=F":"곡물 가격 밀 옥수수","KC=F":"커피 원두 가격","CC=F":"코코아 가격",
+  "KRW=X":"원달러 환율","DX-Y.NYB":"달러 강세 달러인덱스","CNY=X":"위안화 환율","JPY=X":"엔화 환율","AUDUSD=X":"호주달러",
+  "^TNX":"미국 국채 금리","2YY=F":"연준 금리 인하","^VIX":"뉴욕증시 변동성 공포","^GSPC":"뉴욕증시","^IXIC":"나스닥 기술주","^KS11":"코스피",
+  "000001.SS":"중국 경제 지표","^HSI":"홍콩 증시 항셍","^N225":"일본 증시 닛케이","BTC-USD":"비트코인",
+  "sec:semi":"반도체 업황","sec:power":"전력기기 변압기 수주","sec:battery":"2차전지 배터리","sec:steel":"철강 업황","sec:energy":"정유사 정제마진",
+  "sec:ship":"조선 수주","sec:defense":"방산 수출","sec:auto":"자동차 수출 관세","sec:fin":"은행 금융지주 실적","sec:bio":"바이오 제약 신약","sec:internet":"네이버 카카오 AI"
+};
+/*END-NEWS-TOPICS*/
+const NEWS_ALIAS = {CUGOLD:'HG=F',GSR:'GC=F',CURVE:'^TNX',CURVE2:'2YY=F',BW:'CL=F',CRACK:'sec:energy',KRWJPY:'JPY=X',KRWEUR:'KRW=X',KRWCNY:'CNY=X',
+  'RB=F':'CL=F','HO=F':'CL=F','ZC=F':'ZW=F','ZS=F':'ZW=F','SB=F':'ZW=F','LE=F':'ZW=F','PL=F':'sec:auto','PA=F':'sec:auto','^FVX':'^TNX','^TYX':'^TNX','^IRX':'2YY=F',
+  '^STOXX50E':'^GSPC','EURUSD=X':'DX-Y.NYB'};
+let NEWS = {fetchedAt:0, topics:{}};
+const newsKey = s => STOCK_SECTOR[s] ? 'sec:'+STOCK_SECTOR[s] : (NEWS_TOPICS[s] ? s : NEWS_ALIAS[s]);
+const newsFor = s => (NEWS.topics[newsKey(s)]||[]);
+const ago = t => { if(!t) return ''; const m=Math.round((Date.now()-t)/60000); return m<60? m+'분 전' : m<1440? Math.round(m/60)+'시간 전' : Math.round(m/1440)+'일 전'; };
+const esc = x => String(x).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function newsHtml(list, n, label='관련 뉴스'){
+  if(!list || !list.length) return '';
+  return `<div class="sec">${label}</div><ul class="news">${list.slice(0,n).map(x=>`<li><a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a><span>${esc(x.source||'')}${x.time?' · '+ago(x.time):''}</span></li>`).join('')}</ul>`;
+}
+async function loadNews(){
+  try{ const r=await fetch('news.json?t='+Date.now(),{cache:'no-store'}); if(r.ok){ const j=await r.json(); if(j&&j.topics) NEWS=j; } }catch(_){}
+}
 const STOCK_SECTOR = {};
 SECTORS.forEach(sec=>sec.stocks.forEach(([sym,name])=>{
   STOCK_SECTOR[sym]=sec.id;
@@ -836,13 +875,13 @@ function spark(c){
 function renderRegime(){
   const RG = regime(METRICS), W = worldHeadline(RG, INSIGHTS);
   $('worldH').textContent = W.h;
-  renderDelta(RG);
-  $('worldSub').innerHTML = W.sub + (W.top?`<br><span class="note">가장 강한 신호: <a href="#s-top" class="lk">${W.top.title}</a></span>`:'');
+  renderDelta(RG); renderBrief(W);
+  $('worldSub').innerHTML = W.sub;
   $('regime').innerHTML = RG.map(r=>{
     if(r.v==null) return `<div class="rtile"><div class="lbl">${r.k}</div><div class="val">–</div></div>`;
     const w=Math.abs(r.v)/2, left=r.v>=0?50:50-w;
     const col = r.v>=0?'var(--up)':'var(--down)';
-    return `<div class="rtile"><div class="lbl">${r.k} <b class="sc">${r.v>0?'+':''}${r.v}</b></div>
+    return `<div class="rtile"><div class="lbl">${r.k} <b class="scr">${r.v>0?'+':''}${r.v}</b></div>
       <div class="meter"><i style="left:${left}%;width:${w}%;background:${col}"></i><b></b></div>
       <div class="rline">${r.line}</div>
       <div class="parts">${r.parts.map(p=>`<span data-sym="${p.s}" class="${dirCls(p.m1)}">${nm(p.s)}${p.sign<0?'(역)':''} ${arrow(p.m1)}</span>`).join('')}</div></div>`;
@@ -862,6 +901,7 @@ function insCard(x){
     ${x.support&&x.support.length?`<div class="sec">뒷받침하는 신호</div>${li(x.support)}`:''}
     ${x.alt&&x.alt.length?`<div class="sec">다른 해석 가능성</div>${li(x.alt)}`:''}
     ${x.check&&x.check.length?`<div class="sec">확인할 것</div>${li(x.check)}`:''}</details>`:''}
+    ${newsFor(x.syms[0]).length?`<details class="rel"><summary>관련 뉴스 ${Math.min(3,newsFor(x.syms[0]).length)}건 ▾</summary>${newsHtml(newsFor(x.syms[0]),3,'')}</details>`:''}
     ${x.related&&x.related.length?`<details class="rel"><summary>같은 맥락의 신호 ${x.related.length}개 ▾</summary>${x.related.map(r=>`<div class="relx"><b>${r.title}</b><div>${r.meaning}</div>${li(r.ev)}</div>`).join('')}</details>`:''}
     <div class="chips">${x.syms.filter(s=>METRICS[s]).map(s=>`<span class="chip" data-sym="${s}">${nm(s)} ${fmtChg(s,METRICS[s].d5)}</span>`).join('')}</div>
   </div>`;
@@ -919,6 +959,7 @@ function drawSector(){
   const why = [tails.length?`순풍: ${tails.map(desc).join(', ')}`:'', heads.length?`역풍: ${heads.map(desc).join(', ')}`:''].filter(Boolean).join(' / ');
   $('sMacro').innerHTML = `<div class="macro">${verdict} ${why?why+'.':''}<br><span class="note">대표 종목 평균: 1일 ${pct(st.d1)} · 1주 ${pct(st.d5)} · 1개월 ${pct(st.m1)}</span>
     <div style="margin-top:8px">${st.drv.map(d=>`<div class="drv" data-sym="${d.s}"><span>${d.label} <span class="note">(${d.sign>0?'오르면 좋음':'내리면 좋음'})</span></span><span class="${dirCls(d.m.m1)}">1개월 ${fmtChg(d.s,d.m.m1)} · <b>${d.eff>=0.5?'순풍':d.eff<=-0.5?'역풍':'중립'}</b></span></div>`).join('')}</div></div>`;
+  $('sNews').innerHTML = newsHtml(NEWS.topics['sec:'+sec.id], 6, sec.name+' 뉴스');
   $('sList').innerHTML = sec.stocks.map(([s])=>{
     const m=METRICS[s], meta=META[s], on=PREFS.watch.includes(s);
     if(!m) return `<div class="srow"><div class="nm2">${meta.name}<small>${meta.why}</small></div><div></div><div class="pr note">데이터 없음</div><div></div></div>`;
@@ -1013,7 +1054,8 @@ function drawModal(){
     ['52주 고/저',fmtPrice(sym,m.hi)+' / '+fmtPrice(sym,m.lo)],['50일선 대비',meta.kind==='pct'?pct(m.vsMa50):fmtChg(sym,m.vsMa50)],['오늘 움직임 강도',(m.z1==null?'–':Math.abs(m.z1).toFixed(1)+'σ')],['연 변동성',meta.kind==='pct'?m.volAnn.toFixed(1)+'%':meta.kind==='yield'?Math.round(m.volAnn*100)+'bp':m.volAnn.toFixed(2)]];
   $('mStats').innerHTML = st.map(([a,b])=>`<div>${a}<b>${b}</b></div>`).join('');
   const rel = INSIGHTS.filter(x=>x.syms.includes(sym));
-  $('mIns').innerHTML = rel.length? `<h2>관련 인사이트</h2><div class="insights">${rel.map(insCard).join('')}</div>` : '';
+  const nws = newsHtml(newsFor(sym), 5, '관련 뉴스');
+  $('mIns').innerHTML = (nws?`<div style="margin-top:12px">${nws}</div>`:'') + (rel.length? `<h2>관련 인사이트</h2><div class="insights">${rel.map(insCard).join('')}</div>` : '');
   $('mTable').textContent = showTable?'표 닫기':'표 보기';
   const starred = PREFS.watch.includes(sym);
   $('mStar').textContent = starred?'★ 관심종목':'☆ 관심종목 추가'; $('mStar').className = starred?'on':'';
@@ -1036,6 +1078,31 @@ function computePrev(items){
   computeDerived(D);
   const M={}; for(const s of Object.keys(META)){ const m=metrics(s,D[s]); if(m) M[s]=m; }
   return { M, ins: buildInsights(M), rg: regime(M) };
+}
+function renderBrief(W){
+  const g=s=>METRICS[s]; const M=METRICS;
+  const ref = DATA['^GSPC']||DATA['^KS11'];
+  if(ref&&ref.t&&ref.t.length){ const d=new Date(ref.t[ref.t.length-1]*1000);
+    $('briefDate').textContent = `오늘의 브리핑 · ${new Date().toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'short'})} · 미국장 ${d.toLocaleDateString('ko-KR',{month:'numeric',day:'numeric',weekday:'short'})} 마감 기준`; }
+  const b=[];
+  const chg=s=>g(s)?`${nm(s)} <b class="${dirCls(g(s).d1)}">${fmtChg(s,g(s).d1)}</b>`:'';
+  b.push(['증시', ['^GSPC','^IXIC','^KS11','000001.SS'].map(chg).filter(Boolean).join(' · ')]);
+  const comm = ['HG=F','CL=F','GC=F','SI=F','NG=F','ALI=F','ZW=F','ZC=F','ZS=F','KC=F','CC=F','PL=F','PA=F'].filter(s=>g(s)&&g(s).z1!=null).sort((a,b)=>Math.abs(g(b).z1)-Math.abs(g(a).z1)).slice(0,3);
+  b.push(['원자재', comm.map(s=>chg(s)+(Math.abs(g(s).z1)>=1.5?` <span class="note">(평소의 ${Math.abs(g(s).z1).toFixed(1)}배)</span>`:'')).join(' · ')]);
+  const fx=[]; if(g('^TNX')) fx.push(`미 10년물 ${g('^TNX').last.toFixed(2)}% <b class="${dirCls(g('^TNX').d1)}">${bp(g('^TNX').d1)}</b>`);
+  if(g('KRW=X')) fx.push(`원/달러 ${num(g('KRW=X').last,1)}원 <b class="${dirCls(g('KRW=X').d1)}">${fmtChg('KRW=X',g('KRW=X').d1)}</b>`);
+  if(g('DX-Y.NYB')) fx.push(chg('DX-Y.NYB'));
+  b.push(['금리·환율', fx.join(' · ')]);
+  if(W.top){ const first=W.top.meaning.split(/(?<=[.다])\s/)[0]; b.push(['핵심 신호', `<a href="#s-top" class="lk">${W.top.title}</a><br><span class="note">${first}</span>`]); }
+  const secs = SECTORS.map(sec=>({sec, st:sectorStats(sec)})).filter(x=>x.st.d1!=null).sort((a,b)=>b.st.d1-a.st.d1);
+  if(secs.length>=4){ const f=x=>`<span data-sec-open="${x.sec.id}" style="cursor:pointer">${x.sec.name} <b class="${dirCls(x.st.d1)}">${pct(x.st.d1)}</b></span>`;
+    b.push(['섹터', `강세 ${secs.slice(0,2).map(f).join(', ')} / 약세 ${secs.slice(-2).reverse().map(f).join(', ')}`]); }
+  if(W.top&&W.top.check&&W.top.check.length) b.push(['체크', W.top.check.slice(0,2).join(', ')]);
+  $('bpts').innerHTML = b.filter(x=>x[1]).map(([k,v])=>`<li><span class="bk">${k}</span><span>${v}</span></li>`).join('');
+  // 브리핑 뉴스: 핵심 신호 관련 2건 + 코스피·뉴욕증시 1건씩 (중복 제거)
+  const pool=[]; const seen=new Set(); const push=(arr,n)=>{ let c=0; for(const x of (arr||[])){ if(c>=n) break; if(seen.has(x.link)) continue; seen.add(x.link); pool.push(x); c++; } };
+  if(W.top) push(newsFor(W.top.syms[0]),2); push(NEWS.topics['^KS11'],1); push(NEWS.topics['^GSPC'],1); push(NEWS.topics['KRW=X'],1);
+  $('bnews').innerHTML = pool.length? `<div style="margin-top:10px">${newsHtml(pool,5,'오늘 읽을 뉴스')}</div>` : (MODE==='demo'?'<div class="note" style="margin-top:8px">실제 배포 화면에서는 여기에 관련 뉴스가 붙습니다.</div>':'');
 }
 function renderDelta(RG){
   if(!PREV){ $('delta').innerHTML=''; return; }
@@ -1065,6 +1132,7 @@ async function refresh(){
   METRICS={}; for(const s of Object.keys(META)){ const m=metrics(s,DATA[s]); if(m) METRICS[s]=m; }
   INSIGHTS = buildInsights(METRICS);
   try{ PREV = computePrev(res.items); }catch(e){ PREV=null; console.warn(e); }
+  if(SRC!=='api') await loadNews();
   const st=$('status');
   if(MODE==='live'){ st.className='badge live'; st.textContent= SRC==='static'?'실제 시세':'실시간(약 15분 지연)'; }
   else { st.className='badge demo'; st.textContent='데모 데이터'; st.title='로컬 서버(node server.js)로 실행하면 실제 시세를 받아옵니다'; }

@@ -30,6 +30,9 @@ jobs:
           node-version: 20
       - name: 시세 받아오기
         run: node scripts/fetch-data.js public/market.json "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/market.json"
+      - name: 뉴스 받아오기
+        run: node scripts/fetch-news.js public/news.json "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/news.json"
+        continue-on-error: true
       - id: pages
         uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

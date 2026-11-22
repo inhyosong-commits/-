@@ -1,0 +1,56 @@
+// 지표·섹터별 한국어 뉴스 헤드라인 수집 (Google 뉴스 RSS, 키 필요 없음)
+// 사용: node scripts/fetch-news.js public/news.json [이전 news.json URL]
+// 뉴스는 1시간에 한 번만 새로 받고, 그 사이에는 이전 결과를 재사용합니다.
+const fs = require('fs');
+const path = require('path');
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+const REFRESH_MS = 55 * 60 * 1000;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+const decode = s => s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+  .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'").replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').trim();
+const tag = (x, t) => { const m = x.match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)</${t}>`)); return m ? decode(m[1]) : ''; };
+
+async function fetchTopic(q) {
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(q + ' when:3d')}&hl=ko&gl=KR&ceid=KR:ko`;
+  const res = await fetch(url, { headers: { 'User-Agent': UA } });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const xml = await res.text();
+  const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => {
+    const x = m[1];
+    const source = tag(x, 'source');
+    let title = tag(x, 'title');
+    if (source && title.endsWith(' - ' + source)) title = title.slice(0, -(source.length + 3));
+    return { title, link: tag(x, 'link'), source, time: Date.parse(tag(x, 'pubDate')) || null };
+  }).filter(n => n.title && /^https?:\/\//.test(n.link));
+  // 같은 제목 중복 제거, 최신순 6개
+  const seen = new Set();
+  return items.filter(n => { const k = n.title.replace(/\s+/g, '').slice(0, 30); if (seen.has(k)) return false; seen.add(k); return true; })
+    .sort((a, b) => (b.time || 0) - (a.time || 0)).slice(0, 6);
+}
+
+(async () => {
+  const out = process.argv[2] || 'public/news.json';
+  const prevUrl = process.argv[3];
+  const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+  const a = html.indexOf('/*NEWS-TOPICS*/') + '/*NEWS-TOPICS*/'.length, b = html.indexOf('/*END-NEWS-TOPICS*/');
+  const topics = JSON.parse(html.slice(a, b).trim().replace(/^const NEWS_TOPICS\s*=\s*/, '').replace(/;\s*$/, ''));
+
+  let prev = null;
+  if (prevUrl) { try { prev = await (await fetch(prevUrl, { cache: 'no-store' })).json(); } catch (e) { console.log('이전 뉴스 없음'); } }
+  if (prev && prev.fetchedAt && Date.now() - prev.fetchedAt < REFRESH_MS && process.env.FORCE_NEWS !== '1') {
+    fs.writeFileSync(out, JSON.stringify(prev));
+    console.log('뉴스: 최근 것 재사용 (', Math.round((Date.now() - prev.fetchedAt) / 60000), '분 전 수집)');
+    return;
+  }
+  const result = { fetchedAt: Date.now(), topics: {} }, errors = {};
+  for (const [key, q] of Object.entries(topics)) {
+    try { result.topics[key] = await fetchTopic(q); }
+    catch (e) { errors[key] = e.message; if (prev && prev.topics && prev.topics[key]) result.topics[key] = prev.topics[key]; }
+    await sleep(400);
+  }
+  const ok = Object.values(result.topics).filter(v => v && v.length).length;
+  console.log('뉴스: 주제', Object.keys(topics).length, '개 중', ok, '개 수집', Object.keys(errors).length ? errors : '');
+  if (!ok && prev) { fs.writeFileSync(out, JSON.stringify(prev)); return; }
+  fs.writeFileSync(out, JSON.stringify(result));
+})().catch(e => { console.error('뉴스 실패(시세 배포는 계속):', e.message); try { fs.writeFileSync(process.argv[2] || 'public/news.json', JSON.stringify({ fetchedAt: 0, topics: {} })); } catch (_) {} });
