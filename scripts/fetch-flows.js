@@ -12,13 +12,14 @@ const num = v => v == null ? null : +String(v).replace(/[,+]/g, '');
   const out = process.argv[2] || 'public/flows.json', prevUrl = process.argv[3];
   let prev = null;
   if (prevUrl) { try { const r = await fetch(prevUrl, { cache: 'no-store' }); if (r.ok) prev = await r.json(); } catch (_) {} }
-  if (prev && prev.fetchedAt && Date.now() - prev.fetchedAt < REFRESH_MS && process.env.FORCE_FLOWS !== '1') { fs.writeFileSync(out, JSON.stringify(prev)); console.log('수급: 재사용'); return; }
-  const res = { fetchedAt: Date.now(), index: {}, stocks: {} };
+  if (prev && prev.v === 2 && prev.fetchedAt && Date.now() - prev.fetchedAt < REFRESH_MS && process.env.FORCE_FLOWS !== '1') { fs.writeFileSync(out, JSON.stringify(prev)); console.log('수급: 재사용'); return; }
+  const res = { v: 2, fetchedAt: Date.now(), index: {}, stocks: {} };
   for (const idx of ['KOSPI', 'KOSDAQ']) {
     try {
       const j = await get(`https://m.stock.naver.com/api/index/${idx}/integration`);
-      const d = j.dealTrendInfos || [];
-      if (idx === 'KOSPI') console.log('수급 KOSPI 키:', Object.keys(j).join(','), '| 예시:', JSON.stringify(d[0] || null));
+      const raw = j.dealTrendInfo || j.dealTrendInfos || [];
+      const d = Array.isArray(raw) ? raw : (raw.dealTrendInfos || raw.list || [raw]);
+      if (idx === 'KOSPI') console.log('수급 KOSPI dealTrendInfo:', JSON.stringify(raw).slice(0, 600));
       res.index[idx] = d.slice(0, 10).map(x => ({ date: x.bizdate, ind: num(x.personalValue), frg: num(x.foreignValue), inst: num(x.institutionalValue) }));
     } catch (e) { console.log('수급', idx, '실패', e.message); }
   }
@@ -31,7 +32,8 @@ const num = v => v == null ? null : +String(v).replace(/[,+]/g, '');
     try {
       const j = await get(`https://m.stock.naver.com/api/stock/${code}/integration`);
       const d = j.dealTrendInfos || [];
-      if (first) { console.log('수급 종목 키:', Object.keys(j).join(','), '| 예시:', JSON.stringify(d[0] || null)); first = false; }
+      if (first) { console.log('IR일정 예시:', JSON.stringify(j.irScheduleInfo).slice(0, 500), '| 주총:', JSON.stringify(j.shareholdersMeetingInfo).slice(0, 300), '| 컨센서스:', JSON.stringify(j.consensusInfo).slice(0, 300)); first = false; }
+      if (j.irScheduleInfo) res.ir = res.ir || {}, res.ir[code] = j.irScheduleInfo;
       res.stocks[code] = d.slice(0, 10).map(x => ({ date: x.bizdate, frg: num(x.foreignerPureBuyQuant), inst: num(x.organPureBuyQuant), ind: num(x.individualPureBuyQuant), hold: x.foreignerHoldRatio || null }));
     } catch (e) { console.log('수급', code, '실패', e.message); }
     await sleep(150);
