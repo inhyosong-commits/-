@@ -290,7 +290,15 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
     <div class="ask" id="ask"></div>
     <div id="bnews"></div>
   </div>
-  <h2 style="margin-top:14px">4개 렌즈 <small>최근 1개월 흐름 기준 점수</small></h2>
+  </section>
+
+  <section id="s-watch">
+  <h2>내 관심종목 <span class="spacer"></span><button id="editBtn" class="sm">✎ 내 화면 편집</button></h2>
+  <div class="grid" id="watch"></div>
+  </section>
+
+  <section id="s-lens"><details class="grp fold" data-g="f-lens"><summary><span class="gt">4개 렌즈</span><span class="gm" id="fLensSum">경기·물가·돈줄·공포 점수</span><span class="gx">▾</span></summary>
+  <div class="note" style="margin:2px 0 8px">최근 1개월 흐름 기준 점수</div>
   <div class="regime" id="regime"></div>
   <details class="guide"><summary>조합해서 읽는 법 ▾</summary>
     <table class="tbl gtbl">
@@ -307,23 +315,21 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
     </table>
     <p class="note">각 칸의 점수는 구성 지표의 최근 1개월 움직임을 평소 변동폭으로 나눠 평균한 값(−100~+100)입니다. (역)은 반대로 계산한 지표예요.</p>
   </details>
-  </section>
+  </details></section>
 
-  <section id="s-top">
-  <h2>지금 눈에 띄는 신호 <small>여러 지표를 묶어 읽은 해석입니다. 확정이 아닌 '신호'이니 ‘확인할 것’을 함께 보세요.</small></h2>
+  <section id="s-top"><details class="grp fold" data-g="f-top"><summary><span class="gt">눈에 띄는 신호</span><span class="gm" id="fTopSum"></span><span class="gx">▾</span></summary>
+  <div class="note" style="margin:2px 0 8px">여러 지표를 묶어 읽은 해석입니다. 확정이 아닌 '신호'이니 ‘확인할 것’을 함께 보세요.</div>
   <div class="filters" id="insFilters"></div>
   <div class="insights" id="insights"></div>
-  </section>
-
-  <section id="s-watch">
-  <h2>내 관심종목 <span class="spacer"></span><button id="editBtn" class="sm">✎ 내 화면 편집</button></h2>
-  <div class="grid" id="watch"></div>
-  </section>
+  </details></section>
 
 
 
-  <section id="s-sec"><h2>섹터 <small>눌러서 관련 종목과 거시 순풍·역풍 보기 · 숫자는 대표 종목 1주 평균 · 순풍/역풍은 최근 1개월 거시 환경</small></h2>
-  <div class="secgrid" id="sectors"></div></section>
+
+
+  <section id="s-sec"><details class="grp fold" data-g="f-sec"><summary><span class="gt">섹터</span><span class="gm" id="fSecSum"></span><span class="gx">▾</span></summary>
+  <div class="note" style="margin:2px 0 8px">눌러서 관련 종목과 거시 순풍·역풍 보기 · 숫자는 대표 종목 1주 평균 · 순풍/역풍은 최근 1개월 거시 환경</div>
+  <div class="secgrid" id="sectors"></div></details></section>
 
   <section id="s-all"><h2>전체 지표 <small>눌러서 펼치기 · 오른쪽은 오늘 가장 크게 움직인 것</small></h2>
   <div id="groups"></div></section>
@@ -951,6 +957,7 @@ function renderRegime(){
   $('worldH').textContent = W.h;
   renderDelta(RG); renderBrief(W); renderAI(); renderAsk();
   $('worldSub').innerHTML = W.sub;
+  $('fLensSum').textContent = RG.filter(r=>r.v!=null).map(r=>`${r.k} ${r.v>0?'+':''}${r.v}`).join(' · ');
   $('regime').innerHTML = RG.map(r=>{
     if(r.v==null) return `<div class="rtile"><div class="lbl">${r.k}</div><div class="val">–</div></div>`;
     const w=Math.abs(r.v)/2, left=r.v>=0?50:50-w;
@@ -995,7 +1002,7 @@ const DEFAULT_PREFS = { watch:['HG=F','CL=F','GC=F','KRW=X','^KS11','^TNX','CUGO
 let PREFS = loadPrefs();
 function loadPrefs(){ try{ const p=JSON.parse(localStorage.getItem('cmPrefs')); if(p&&Array.isArray(p.watch)) return Object.assign({},DEFAULT_PREFS,p,{watch:p.watch.filter(s=>META[s])}); }catch(_){} return JSON.parse(JSON.stringify(DEFAULT_PREFS)); }
 function savePrefs(){ try{ localStorage.setItem('cmPrefs', JSON.stringify(PREFS)); }catch(_){} }
-const SECTIONS = [['s-world','오늘의 세계'],['s-top','눈에 띄는 신호'],['s-watch','내 관심종목'],['s-sec','섹터'],...GROUPS.map(([g,l])=>['g-'+g,l])];
+const SECTIONS = [['s-world','오늘의 세계'],['s-watch','내 관심종목'],['s-lens','4개 렌즈'],['s-top','눈에 띄는 신호'],['s-sec','섹터'],...GROUPS.map(([g,l])=>['g-'+g,l])];
 const isHidden = id=>PREFS.hidden.includes(id);
 
 function renderEdit(){
@@ -1179,6 +1186,11 @@ function renderAll(){
   if(!Object.keys(METRICS).length) return;
   renderWatch(); renderRegime(); renderInsights(); renderSectors(); renderGroups(); renderPick(); renderCal();
   if(curSec&&$('secm').classList.contains('open')) drawSector();
+  const sig=INSIGHTS.filter(x=>x.level!=='info');
+  $('fTopSum').innerHTML = sig.length? `<b style="color:var(--st-serious)">${sig.length}개</b> · ${esc(sig[0].title)}` : '특별한 신호 없음';
+  const ss=SECTORS.map(sec=>({sec,st:sectorStats(sec)})).sort((a,b)=>b.st.score-a.st.score);
+  $('fSecSum').textContent = `순풍: ${ss.filter(x=>x.st.wind==='tail').map(x=>x.sec.name).slice(0,3).join(', ')||'없음'}`;
+  document.querySelectorAll('details.fold').forEach(d=>{ if(!d.dataset.init){ d.dataset.init=1; d.open=OPEN.has(d.dataset.g); } });
   for(const [id] of SECTIONS){ const el=$(id); if(el) el.style.display=isHidden(id)?'none':''; }
 }
 function renderWatch(){
@@ -1199,7 +1211,7 @@ function renderGroups(){
   }).join('');
   const alerts = INSIGHTS.filter(x=>x.level!=='info').length;
   const short = {growth:'경기',infl:'인플레',money:'금리·달러',mood:'심리',stocks:'주가',softs:'농산물'};
-  $('secnav').innerHTML = `<a href="#s-world">요약</a><a href="#s-top">신호${alerts?`<b>${alerts}</b>`:''}</a><a href="#s-watch">내 종목</a><a href="#s-sec">섹터</a><a href="#g-krw" data-open-g="krw">원화</a><a href="#s-all">전체 지표</a>`;
+  $('secnav').innerHTML = `<a href="#s-world">요약</a><a href="#s-watch">내 종목</a><a href="#s-top" data-open-f="f-top">신호${alerts?`<b>${alerts}</b>`:''}</a><a href="#s-sec" data-open-f="f-sec">섹터</a><a href="#g-krw" data-open-g="krw">원화</a><a href="#s-all">전체 지표</a>`;
 }
 function tile(s, flagged){
       const m=METRICS[s], meta=META[s];
@@ -1446,6 +1458,7 @@ document.addEventListener('click', e=>{
   const rm=t.closest('[data-rm]'); if(rm){ PREFS.watch=PREFS.watch.filter(s=>s!==rm.dataset.rm); applyPrefs(); return; }
   const tg=t.closest('[data-tg]'); if(tg){ const s=tg.dataset.tg; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); return; }
   if(t===$('edit')){ $('edit').classList.remove('open'); return; }
+  const of=t.closest('[data-open-f]'); if(of){ const d=document.querySelector(`details[data-g="${of.dataset.openF}"]`); if(d) d.open=true; }
   const og=t.closest('[data-open-g]'); if(og){ const d=document.querySelector(`details[data-g="${og.dataset.openG}"]`); if(d) d.open=true; }
   const cp=t.closest('[data-copy]'); if(cp){ const prompt = cp.dataset.copy==='pick' ? pickPrompt() : cp.dataset.copy==='cal' ? calPrompt() : $('secm').classList.contains('open') ? sectorPrompt(SECTORS.find(x=>x.id===curSec)) : askPrompt();
     navigator.clipboard.writeText(prompt).then(()=>{ cp.textContent='복사됨 ✓'; setTimeout(()=>cp.textContent='질문 복사',1500); }).catch(()=>{ cp.textContent='복사 실패'; }); return; }
