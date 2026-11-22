@@ -542,7 +542,34 @@ const ago = t => { if(!t) return ''; const m=Math.round((Date.now()-t)/60000); r
 const esc = x => String(x).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function newsHtml(list, n, label='관련 뉴스'){
   if(!list || !list.length) return '';
-  return `<div class="sec">${label}</div><ul class="news">${list.slice(0,n).map(x=>`<li>${x.en?'<em class="en">해외</em> ':''}<a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer" ${x.ko?`title="${esc(x.title)}"`:''}>${esc(x.ko||x.title)}</a><span>${x.ko?'번역 · ':''}${esc(x.source||'')}${x.time?' · '+ago(x.time):''}</span></li>`).join('')}</ul>`;
+  return `<div class="sec">${label}</div><ul class="news">${list.slice(0,n).map(x=>`<li>${x.en?'<em class="en">해외</em> ':''}<a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer" ${(x.ko||T(x.title))?`title="${esc(x.title)}"`:''}>${esc(x.ko||T(x.title)||x.title)}</a><span>${(x.ko||T(x.title))?'번역 · ':''}${esc(x.source||'')}${x.time?' · '+ago(x.time):''}</span></li>`).join('')}</ul>`;
+}
+/* ---- 영어 → 한국어 번역 (이 기기에서 Google 번역 공개 주소로, 결과는 기기에 저장) ---- */
+let TRC={}; try{ TRC=JSON.parse(localStorage.getItem('cmTr')||'{}'); }catch(_){}
+const nrm = t=> String(t||'').replace(/\s+/g,' ').trim();
+const T = t=> t? (TRC[nrm(t)]||null) : null;
+let trBusy=false;
+async function translateMissing(){
+  if(trBusy) return; trBusy=true;
+  const texts=[];
+  if(NEWS&&NEWS.topics) for(const [k,v] of Object.entries(NEWS.topics)) if(k.startsWith('en:')) for(const x of v||[]) if(!x.ko) texts.push(x.title);
+  if(EVENTS){ for(const v of Object.values(EVENTS.trials||{})) for(const x of v) { if(!x.titleKo) texts.push(x.title); if(!x.condKo) texts.push(x.cond); if(!x.summaryKo) texts.push(x.summary); }
+    for(const v of Object.values(EVENTS.bio||{})) for(const x of v||[]) if(x.en&&!x.ko) texts.push(x.title); }
+  const todo=[...new Set(texts.map(nrm))].filter(t=>t&&/[A-Za-z]{3}/.test(t)&&!TRC[t]);
+  let changed=false;
+  for(let i=0;i<todo.length;){
+    const b=[]; let len=0;
+    while(i<todo.length && b.length<25 && len+todo[i].length<1500){ b.push(todo[i]); len+=todo[i].length+1; i++; }
+    if(!b.length){ b.push(todo[i].slice(0,1500)); i++; }
+    try{
+      const r=await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&q='+encodeURIComponent(b.join('\n')));
+      if(!r.ok) break;
+      const j=await r.json(); const out=(j[0]||[]).map(x=>x[0]).join('').split('\n').map(x=>x.trim());
+      if(out.length===b.length){ b.forEach((t,k)=>{ if(out[k]) TRC[t]=out[k]; }); changed=true; }
+    }catch(_){ break; }
+  }
+  if(changed){ const ks=Object.keys(TRC); if(ks.length>2000) ks.slice(0,ks.length-2000).forEach(k=>delete TRC[k]); try{ localStorage.setItem('cmTr',JSON.stringify(TRC)); }catch(_){} renderAll(); }
+  trBusy=false;
 }
 let REPORT=null;
 async function loadReport(){
@@ -1200,9 +1227,9 @@ const TRIAL_SCEN = {up:'주요 목표 달성(성공) → 허가·매출 기대 �
 function trialWhy(tr){
   const parts=[];
   if(tr.drugs&&tr.drugs.length) parts.push('시험약: '+tr.drugs.join(', '));
-  parts.push('대상: '+(tr.condKo||tr.cond||'–'));
+  parts.push('대상: '+(tr.condKo||T(tr.cond)||tr.cond||'–'));
   if(tr.enroll) parts.push(`환자 ${Number(tr.enroll).toLocaleString('ko-KR')}명`);
-  return parts.join(' · ') + (tr.summaryKo||tr.summary ? '\n무엇을 시험하나: '+(tr.summaryKo||tr.summary) : (tr.titleKo? '\n'+tr.titleKo:''));
+  return parts.join(' · ') + (tr.summary ? '\n무엇을 시험하나: '+(tr.summaryKo||T(tr.summary)||tr.summary) : '\n'+(tr.titleKo||T(tr.title)||tr.title));
 }
 const SIMPLE = `전문 용어는 쓰지 말고 친구에게 설명하듯 쉽게, 짧게 답해줘. 매수·매도 추천은 하지 마.`;
 function trialAsk(s,tr){ return `${META[s].name}의 3상 임상이 곧 끝나. 최신 정보를 검색해서 알려줘.
@@ -1271,7 +1298,7 @@ function renderCal(){
   const bioHtml = bio.length? `<div class="pbox"><h3>바이오 임상·허가 소식</h3><p class="pd">임상시험 결과나 허가 결정은 날짜가 미리 공개되지 않는 경우가 많아서, 최근 2주 뉴스로 보여 드려요.</p>${bio.map(([s,v])=>newsHtml(v,3,(META[s]?META[s].name:s))).join('')}</div>` : '';
   const ym = t=>{ const d=new Date(t); return `${d.getFullYear()}.${d.getMonth()+1}`; };
   const tri = EVENTS&&EVENTS.trials ? Object.entries(EVENTS.trials).filter(([s,v])=>v&&v.length&&META[s]&&(!calMine||PREFS.watch.includes(s))) : [];
-  const triHtml = tri.length? `<div class="pbox"><h3>3상 임상 마무리 예정 (앞으로 6개월)</h3><p class="pd">ClinicalTrials.gov(미국 정부 임상 등록 사이트)에 회사가 등록한 "주요 완료 예정일"이에요. 결과 발표일은 아니지만, 이 시점 전후로 결과가 나올 가능성이 높아요. 날짜는 회사 사정으로 자주 바뀝니다.</p>${tri.map(([s,v])=>`<div class="sec">${META[s].name}</div><ul class="tl">${v.slice(0,6).map(tr=>`<li><a href="https://clinicaltrials.gov/study/${esc(tr.nct)}" target="_blank" rel="noopener noreferrer"><b>${ym(tr.date)}${tr.est?' 예정':' 완료'}</b> · ${esc(tr.acronym?tr.acronym+' – ':'')}${esc(tr.titleKo||tr.title)}</a><span>${esc(tr.condKo||tr.cond||'')}${tr.drugs&&tr.drugs.length?' · '+esc(tr.drugs.join(', ')):''}</span><span>${askLink(trialAsk(s,tr))}</span></li>`).join('')}</ul>`).join('')}</div>` : '';
+  const triHtml = tri.length? `<div class="pbox"><h3>3상 임상 마무리 예정 (앞으로 6개월)</h3><p class="pd">ClinicalTrials.gov(미국 정부 임상 등록 사이트)에 회사가 등록한 "주요 완료 예정일"이에요. 결과 발표일은 아니지만, 이 시점 전후로 결과가 나올 가능성이 높아요. 날짜는 회사 사정으로 자주 바뀝니다.</p>${tri.map(([s,v])=>`<div class="sec">${META[s].name}</div><ul class="tl">${v.slice(0,6).map(tr=>`<li><a href="https://clinicaltrials.gov/study/${esc(tr.nct)}" target="_blank" rel="noopener noreferrer"><b>${ym(tr.date)}${tr.est?' 예정':' 완료'}</b> · ${esc(tr.acronym?tr.acronym+' – ':'')}${esc(tr.titleKo||T(tr.title)||tr.title)}</a><span>${esc(tr.condKo||T(tr.cond)||tr.cond||'')}${tr.drugs&&tr.drugs.length?' · '+esc(tr.drugs.join(', ')):''}</span><span>${askLink(trialAsk(s,tr))}</span></li>`).join('')}</ul>`).join('')}</div>` : '';
   const dar = EVENTS&&EVENTS.dart ? Object.entries(EVENTS.dart).filter(([s,v])=>v&&v.length&&META[s]&&(!calMine||PREFS.watch.includes(s))) : [];
   const dartHtml = EVENTS&&EVENTS.dart ? `<div class="pbox"><h3>한국 종목 중요 공시 (최근 30일)</h3><p class="pd">금융감독원 DART에서 실적, 실적설명회(IR), 배당, 주총, 대형 계약, 임상·허가 관련 공시만 골랐어요. 누르면 공시 원문이 열려요.</p>${dar.length? dar.map(([s,v])=>`<div class="sec">${META[s].name}</div><ul class="tl">${v.map(x=>`<li><a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">${/기업설명회/.test(x.title)?'📅 ':''}${esc(x.title)}</a><span>${new Date(x.date).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'})} 공시</span></li>`).join('')}</ul>`).join('') : '<p class="note">최근 30일 동안 중요 공시가 없어요.</p>'}</div>` : '';
   el.innerHTML = `<p class="note" style="margin:6px 0 0">앞으로 60일 일정 · 실적 발표일은 회사가 확정하기 전엔 "예상일"로 표시돼요. 거시 일정은 미국 기준이고 발표 시각은 한국시간 밤~새벽이에요.</p>`
@@ -1591,6 +1618,7 @@ async function refresh(){
   updateAge();
   renderAll();
   if(curSym) drawModal();
+  translateMissing();
   $('refresh').disabled=false; busy=false;
 }
 
