@@ -37,7 +37,12 @@ nav.sec::-webkit-scrollbar{display:none}
 .tabs{display:flex;gap:4px;margin:0 0 8px;background:var(--surface-2);border-radius:10px;padding:3px}
 .tabs button{flex:1;min-height:36px;border:0;border-radius:8px;background:none;color:var(--text-secondary);font-size:14px;font-weight:600;cursor:pointer}
 .tabs button.on{background:var(--surface);color:var(--text-primary);box-shadow:0 1px 3px rgba(0,0,0,.15)}
-body.pick nav.sec, body.pick #tab-mkt{display:none} body:not(.pick) #tab-pick{display:none}
+body.pick nav.sec, body.pick #tab-mkt, body.cal nav.sec, body.cal #tab-mkt{display:none} body:not(.pick) #tab-pick{display:none} body:not(.cal) #tab-cal{display:none}
+.cday{margin:14px 0 4px;font-size:13px;font-weight:700;color:var(--text-secondary)} .cday b{color:var(--st-warn);margin-left:6px}
+.crow{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin:6px 0}
+.crow .ct{font-weight:600;font-size:14.5px} .crow .cw{font-size:12.5px;color:var(--text-secondary);margin-top:3px;line-height:1.45}
+.ctag{font-size:11px;font-weight:700;padding:3px 7px;border-radius:6px;white-space:nowrap;background:var(--surface-2);color:var(--text-secondary)} .ctag.e{color:#e08a00} .ctag.m{color:#3b82f6}
+.crow.mine{border-color:var(--st-warn)}
 .pbox{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin:10px 0}
 .pbox h3{margin:0 0 4px;font-size:16px} .pbox .pd{color:var(--text-secondary);font-size:13px;margin:0 0 8px;line-height:1.5}
 .prow{display:grid;grid-template-columns:minmax(0,1fr) auto 40px;gap:8px;align-items:center;padding:10px 2px;border-top:1px solid var(--border);cursor:pointer}
@@ -260,13 +265,17 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
     <button id="theme" title="밝게/어둡게" aria-label="밝게/어둡게">◐</button>
   </div>
   <div class="note" id="updated" style="margin:-4px 0 6px"></div>
-  <div class="tabs" role="tablist"><button data-tab="mkt" class="on">시장 보기</button><button data-tab="pick">종목 고르기</button></div>
+  <div class="tabs" role="tablist"><button data-tab="mkt" class="on">시장 보기</button><button data-tab="pick">종목 고르기</button><button data-tab="cal">일정</button></div>
   <nav class="sec" id="secnav"></nav>
 </header>
 <main>
   <div id="tab-pick">
     <div class="disc"><b>추천이 아니라 "살펴볼 후보"예요.</b> 지금의 거시 환경(금리·환율·원자재 흐름)과 주가 흐름만 보고 기계적으로 분류했습니다. 회사 실적, 가격 수준(비싼지 싼지), 내 상황은 반영하지 않았어요. 투자 결정은 꼭 직접 확인하고 내려 주세요.</div>
     <div id="pick"></div>
+  </div>
+  <div id="tab-cal">
+    <div class="filters" id="calF"></div>
+    <div id="cal"></div>
   </div>
   <div id="tab-mkt">
   <section id="s-world">
@@ -1035,7 +1044,7 @@ function drawSector(){
 }
 /* ---- 종목 고르기 탭 ---- */
 function setTab(t){
-  document.body.classList.toggle('pick', t==='pick');
+  document.body.classList.toggle('pick', t==='pick'); document.body.classList.toggle('cal', t==='cal');
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===t));
   try{ localStorage.setItem('cmTab', t); }catch(_){}
   window.scrollTo(0,0);
@@ -1061,7 +1070,7 @@ function pickRow(r){
   const trT = r.trend===1?`<span class="tag g">상승 흐름</span>`: r.trend===-1?`<span class="tag b">하락 흐름</span>`:`<span class="tag">방향 없음</span>`;
   const why = r.env===1&&r.tails.length? `${r.tails.slice(0,2).join(', ')} 흐름이 ${r.sec.name}에 유리` : r.env===-1&&r.heads.length? `${r.heads.slice(0,2).join(', ')} 흐름이 ${r.sec.name}에 부담` : `${r.sec.name} 업종`;
   return `<div class="prow" data-sym="${r.s}"><div><div class="pn">${esc(r.name)}<small>${r.sec.name}</small></div>
-    <div class="pw">${envT}${trT}<span class="tag">고점 대비 ${r.dd.toFixed(0)}%</span><br>${why}</div></div>
+    <div class="pw">${envT}${trT}<span class="tag">고점 대비 ${r.dd.toFixed(0)}%</span>${earnTag(r.s)}<br>${why}</div></div>
     <div class="pr ${dirCls(r.m.m1)}">1개월<br>${arrow(r.m.m1)} ${pct(r.m.m1)}</div>
     <button class="st ${on?'on':''}" data-star="${r.s}" aria-label="관심종목">${on?'★':'☆'}</button></div>`;
 }
@@ -1099,9 +1108,65 @@ function renderPick(){
     + `<div class="pbox"><h3>⑥ AI에게 검증받기</h3><p class="pd">위 후보들을 그대로 넣은 질문으로 열려요. 뉴스와 실적 전망으로 왜 좋아 보이는지, 위험은 뭔지, 이미 비싼지 확인해 줍니다.</p><div class="askrow">${askButtons(pickPrompt(),'pick')}</div></div>`
     + `<p class="note">분류 기준: 환경 = 업종의 거시 순풍·역풍 점수(섹터 화면과 같음), 흐름 = 50일 평균 대비 위치와 3개월 수익률. ☆를 누르면 내 관심종목에 추가돼요.</p>`;
 }
+/* ---- 일정 탭 ---- */
+let EVENTS=null, calMine=false;
+async function loadEvents(){
+  try{ const r=await fetch('events.json?t='+Date.now(),{cache:'no-store'}); if(r.ok) EVENTS=await r.json(); }catch(_){}
+}
+const DAY=864e5;
+const kstDay = ms => { const d=new Date(ms+9*3600e3); return Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()); };
+const dday = ms => Math.round((kstDay(ms)-kstDay(Date.now()))/DAY);
+function earnTag(s){
+  const e=EVENTS&&EVENTS.earnings&&EVENTS.earnings[s]; if(!e) return '';
+  const d=dday(e.date); if(d<0||d>21) return '';
+  return `<span class="tag" style="color:#e08a00">실적 ${d===0?'오늘':'D-'+d}</span>`;
+}
+const MK = {fomc:['금리','미국 금리 결정'],cpi:['물가','미국 물가'],jobs:['고용','미국 고용']};
+function calItems(){
+  const now=Date.now(), out=[];
+  if(!EVENTS) return out;
+  for(const m of EVENTS.macro||[]){ const t=Date.parse(m.date+'T12:00:00Z'); const d=dday(t); if(d>=0&&d<=60) out.push({t,d,kind:'m',tag:MK[m.kind]?MK[m.kind][0]:'거시',title:m.title,why:m.why}); }
+  for(const [s,e] of Object.entries(EVENTS.earnings||{})){
+    if(!META[s]) continue; const d=dday(e.date); if(d<0||d>60) continue;
+    const sec=SECTORS.find(x=>x.id===STOCK_SECTOR[s]);
+    const range = e.end&&dday(e.end)!==d ? ` ~ ${new Date(e.end).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'})} 사이` : '';
+    out.push({t:e.date,d,kind:'e',tag:'실적',sym:s,mine:PREFS.watch.includes(s),title:`${META[s].name} 실적 발표${e.estimate?' (예상일)':''}`,
+      why:`${sec?sec.name+' 업종 · ':''}분기 성적표 발표${range}. 같은 업종 종목도 함께 움직일 수 있어요.`});
+  }
+  return out.filter(x=>!calMine||x.mine||x.kind==='m').sort((a,b)=>a.t-b.t);
+}
+function calPrompt(){
+  const mine=PREFS.watch.filter(s=>META[s]&&META[s].stock).map(s=>META[s].name);
+  const P=pickData(); const cand=[...P.A,...P.B].slice(0,6).map(r=>r.name).filter(n=>!mine.includes(n));
+  return `앞으로 1~2달 동안 아래 종목들에 영향을 줄 수 있는 일정을 최신 뉴스와 공시를 검색해서 날짜순으로 정리해줘.
+포함할 것: 실적 발표일, 임상시험 결과 발표, FDA·식약처 허가 결정일, 신제품·기술 발표, 주주총회·배당일, 대형 수주 발표 예정, 중요한 소송·규제 결정.
+종목마다: 날짜(확정인지 예상인지) → 무슨 일 → 결과에 따라 주가에 어떤 영향이 갈 수 있는지(좋은 경우/나쁜 경우 화살표로 짧게).
+나는 전문가가 아니니까 쉽게 말해줘. 매수·매도 추천은 하지 마.
+
+[내 관심종목] ${mine.join(', ')||'없음'}
+[대시보드 후보 종목] ${cand.join(', ')||'없음'}`;
+}
+function renderCal(){
+  const el=$('cal'); if(!el) return;
+  $('calF').innerHTML = `<button data-calf="all" class="${calMine?'':'on'}">전체</button><button data-calf="mine" class="${calMine?'on':''}">내 관심종목만</button>`;
+  const items=calItems();
+  let html='', last=null;
+  for(const x of items){
+    const day=kstDay(x.t);
+    if(day!==last){ last=day; const dt=new Date(day); html+=`<div class="cday">${dt.getUTCMonth()+1}월 ${dt.getUTCDate()}일 (${'일월화수목금토'[dt.getUTCDay()]})<b>${x.d===0?'오늘':'D-'+x.d}</b></div>`; }
+    html+=`<div class="crow ${x.mine?'mine':''}" ${x.sym?`data-sym="${x.sym}"`:''}><span class="ctag ${x.kind}">${x.tag}</span><div><div class="ct">${x.mine?'★ ':''}${esc(x.title)}</div><div class="cw">${esc(x.why)}</div></div></div>`;
+  }
+  if(!EVENTS) html=`<p class="note">일정 데이터를 아직 못 받았어요. 몇 분 뒤 새로고침해 주세요.</p>`;
+  else if(!items.length) html=`<p class="note">앞으로 60일 안에 잡힌 일정이 없어요.</p>`;
+  const bio = EVENTS&&EVENTS.bio ? Object.entries(EVENTS.bio).filter(([,v])=>v&&v.length) : [];
+  const bioHtml = bio.length? `<div class="pbox"><h3>바이오 임상·허가 소식</h3><p class="pd">임상시험 결과나 허가 결정은 날짜가 미리 공개되지 않는 경우가 많아서, 최근 2주 뉴스로 보여 드려요.</p>${bio.map(([s,v])=>newsHtml(v,3,(META[s]?META[s].name:s))).join('')}</div>` : '';
+  el.innerHTML = `<p class="note" style="margin:6px 0 0">앞으로 60일 일정 · 실적 발표일은 회사가 확정하기 전엔 "예상일"로 표시돼요. 거시 일정은 미국 기준이고 발표 시각은 한국시간 밤~새벽이에요.</p>`
+    + html + bioHtml
+    + `<div class="pbox"><h3>AI에게 일정 더 찾아보기</h3><p class="pd">임상 결과, 허가 결정, 신제품 발표, 배당·주총처럼 자동으로 못 가져오는 일정을 내 관심종목과 후보 종목 기준으로 찾아 줘요.</p><div class="askrow">${askButtons(calPrompt(),'cal')}</div></div>`;
+}
 function renderAll(){
   if(!Object.keys(METRICS).length) return;
-  renderWatch(); renderRegime(); renderInsights(); renderSectors(); renderGroups(); renderPick();
+  renderWatch(); renderRegime(); renderInsights(); renderSectors(); renderGroups(); renderPick(); renderCal();
   if(curSec&&$('secm').classList.contains('open')) drawSector();
   for(const [id] of SECTIONS){ const el=$(id); if(el) el.style.display=isHidden(id)?'none':''; }
 }
@@ -1354,7 +1419,7 @@ async function refresh(){
   METRICS={}; for(const s of Object.keys(META)){ const m=metrics(s,DATA[s]); if(m) METRICS[s]=m; }
   INSIGHTS = buildInsights(METRICS);
   try{ PREV = computePrev(res.items); }catch(e){ PREV=null; console.warn(e); }
-  if(SRC!=='api'){ await loadNews(); await loadReport(); }
+  if(SRC!=='api'){ await loadNews(); await loadReport(); await loadEvents(); }
   const st=$('status');
   if(MODE==='live'){ st.className='badge live'; st.textContent= SRC==='static'?'실제 시세':'실시간(약 15분 지연)'; }
   else { st.className='badge demo'; st.textContent='데모 데이터'; st.title='로컬 서버(node server.js)로 실행하면 실제 시세를 받아옵니다'; }
@@ -1371,8 +1436,9 @@ document.addEventListener('click', e=>{
   const tg=t.closest('[data-tg]'); if(tg){ const s=tg.dataset.tg; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); return; }
   if(t===$('edit')){ $('edit').classList.remove('open'); return; }
   const og=t.closest('[data-open-g]'); if(og){ const d=document.querySelector(`details[data-g="${og.dataset.openG}"]`); if(d) d.open=true; }
-  const cp=t.closest('[data-copy]'); if(cp){ const prompt = cp.dataset.copy==='pick' ? pickPrompt() : $('secm').classList.contains('open') ? sectorPrompt(SECTORS.find(x=>x.id===curSec)) : askPrompt();
+  const cp=t.closest('[data-copy]'); if(cp){ const prompt = cp.dataset.copy==='pick' ? pickPrompt() : cp.dataset.copy==='cal' ? calPrompt() : $('secm').classList.contains('open') ? sectorPrompt(SECTORS.find(x=>x.id===curSec)) : askPrompt();
     navigator.clipboard.writeText(prompt).then(()=>{ cp.textContent='복사됨 ✓'; setTimeout(()=>cp.textContent='질문 복사',1500); }).catch(()=>{ cp.textContent='복사 실패'; }); return; }
+  const cf=t.closest('[data-calf]'); if(cf){ calMine=cf.dataset.calf==='mine'; renderCal(); return; }
   const tb=t.closest('[data-tab]'); if(tb){ setTab(tb.dataset.tab); return; }
   const star=t.closest('[data-star]'); if(star){ const s=star.dataset.star; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); return; }
   const so=t.closest('[data-sec-open]'); if(so){ openSector(so.dataset.secOpen); return; }
@@ -1386,7 +1452,7 @@ document.addEventListener('click', e=>{
 document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ if($('modal').classList.contains('open')) closeModal(); else { $('edit').classList.remove('open'); $('secm').classList.remove('open'); } } if(e.key==='Enter'&&e.target.dataset&&e.target.dataset.sym) openModal(e.target.dataset.sym); });
 $('mClose').onclick=closeModal;
 $('mStar').onclick=()=>{ const s=curSym; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); drawModal(); };
-try{ if(location.hash==='#pick'||localStorage.getItem('cmTab')==='pick') setTab('pick'); }catch(_){}
+try{ const tb0=location.hash==='#pick'?'pick':location.hash==='#cal'?'cal':localStorage.getItem('cmTab'); if(tb0==='pick'||tb0==='cal') setTab(tb0); }catch(_){}
 $('editBtn').onclick=()=>{ renderEdit(); $('edit').classList.add('open'); };
 $('sClose').onclick=()=>$('secm').classList.remove('open');
 $('eClose').onclick=()=>$('edit').classList.remove('open');
