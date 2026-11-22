@@ -497,7 +497,7 @@ function renderAI(){
   const t=new Date(REPORT.generatedAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'});
   const host=u=>{ try{ return new URL(u).hostname.replace(/^www\./,''); }catch(_){ return u; } };
   const para=x=>esc(x).replace(/\n+/g,'<br>');
-  box.innerHTML = `<div class="aitag">AI 보고서 · ${t} 작성 · 국내외 뉴스 종합</div>
+  box.innerHTML = `<div class="aitag">AI 보고서 (${/claude/i.test(REPORT.model||"")?"Claude":"Perplexity"}) · ${t} 작성 · 국내외 뉴스 종합</div>
     ${REPORT.headline?`<div class="aih">${esc(REPORT.headline)}</div>`:''}
     ${REPORT.summary?`<p class="ais">${para(REPORT.summary)}</p>`:''}
     <div class="bpts">${(REPORT.sections||[]).map((x,i)=>`<div class="rp"><div class="rh">${i+1}. ${esc(x.title||'')}</div><p>${para(x.body||'')}</p></div>`).join('')}

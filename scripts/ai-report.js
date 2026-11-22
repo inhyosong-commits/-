@@ -52,7 +52,21 @@ function newsLines(nw) {
   const write = obj => fs.writeFileSync(outPath, JSON.stringify(obj));
   let prev = null;
   if (prevUrl) { try { const r = await fetch(prevUrl, { cache: 'no-store' }); if (r.ok) prev = await r.json(); } catch (_) {} }
-  if (!KEY) { console.log('AI 리포트: PERPLEXITY_API_KEY 없음 → 건너뜀'); if (prev) write(prev); return; }
+  // 스냅샷: Claude 예약 작업이 읽어 가는 숫자·뉴스 요약 (항상 작성)
+  if (process.env.SNAPSHOT_OUT) {
+    try {
+      const m = JSON.parse(fs.readFileSync(marketPath, 'utf8'));
+      let n = { topics: {} }; try { n = JSON.parse(fs.readFileSync(newsPath, 'utf8')); } catch (_) {}
+      const t = new Date(Date.now() + 9 * 3600e3).toISOString().replace('T', ' ').slice(0, 16);
+      fs.writeFileSync(process.env.SNAPSHOT_OUT, `기준 시각(한국시간): ${t}\n\n[시세: 종가 기준, 1일·1주·1개월 변화]\n${marketLines(m)}\n\n[참고 뉴스 헤드라인(국내·해외)]\n${newsLines(n)}\n`);
+    } catch (e) { console.error('스냅샷 실패:', e.message); }
+  }
+  // Claude 구독으로 쓴 리포트(data/claude-report.json)가 더 최신이면 그걸 사용
+  try {
+    const c = JSON.parse(fs.readFileSync('data/claude-report.json', 'utf8'));
+    if (c && c.sections && c.generatedAt && (!prev || !prev.generatedAt || c.generatedAt > prev.generatedAt)) prev = c;
+  } catch (_) {}
+  if (!KEY) { console.log('AI 리포트: Perplexity 키 없음 → ' + (prev ? '저장된 리포트 사용 (' + (prev.model || '') + ')' : '리포트 없음')); if (prev) write(prev); return; }
   const now = Date.now();
   if (prev && prev.generatedAt && prev.generatedAt >= slotOf(now) && process.env.FORCE_REPORT !== '1') {
     console.log('AI 리포트: 이번 회차 이미 작성됨 → 재사용'); write(prev); return;
