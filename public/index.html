@@ -295,6 +295,7 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
     <div id="aiRep"></div>
     <div id="bptsWrap"><div class="bpts" id="bpts"></div></div>
     <div class="delta" id="delta"></div>
+    <div class="delta" id="flowLine"></div>
     <div class="ask" id="ask"></div>
     <div id="bnews"></div>
   </div>
@@ -970,7 +971,7 @@ function spark(c){
 function renderRegime(){
   const RG = regime(METRICS), W = worldHeadline(RG, INSIGHTS);
   $('worldH').textContent = W.h;
-  renderDelta(RG); renderBrief(W); renderAI(); renderAsk();
+  renderDelta(RG); renderFlowLine(); renderBrief(W); renderAI(); renderAsk();
   $('worldSub').innerHTML = W.sub;
   $('fLensSum').textContent = RG.filter(r=>r.v!=null).map(r=>`${r.k} ${r.v>0?'+':''}${r.v}`).join(' · ');
   $('regime').innerHTML = RG.map(r=>{
@@ -1094,7 +1095,7 @@ function pickRow(r){
   const trT = r.trend===1?`<span class="tag g">상승 흐름</span>`: r.trend===-1?`<span class="tag b">하락 흐름</span>`:`<span class="tag">방향 없음</span>`;
   const why = r.env===1&&r.tails.length? `${r.tails.slice(0,2).join(', ')} 흐름이 ${r.sec.name}에 유리` : r.env===-1&&r.heads.length? `${r.heads.slice(0,2).join(', ')} 흐름이 ${r.sec.name}에 부담` : `${r.sec.name} 업종`;
   return `<div class="prow" data-sym="${r.s}"><div><div class="pn">${esc(r.name)}<small>${r.sec.name}</small></div>
-    <div class="pw">${envT}${trT}<span class="tag">고점 대비 ${r.dd.toFixed(0)}%</span>${earnTag(r.s)}<br>${why}</div></div>
+    <div class="pw">${envT}${trT}<span class="tag">고점 대비 ${r.dd.toFixed(0)}%</span>${earnTag(r.s)}${(()=>{ const f=flowSum(r.s,5), t=targetOf(r.s); let o=''; if(f&&Math.abs(f.frg)>=10) o+=`<span class="tag ${f.frg>0?'g':'b'}">외국인 5일 ${f.frg>0?'순매수':'순매도'}</span>`; if(t&&r.m) o+=`<span class="tag">목표가까지 ${pct((t.tp/r.m.last-1)*100,0)}</span>`; return o; })()}<br>${why}</div></div>
     <div class="pr ${dirCls(r.m.m1)}">1개월<br>${arrow(r.m.m1)} ${pct(r.m.m1)}</div>
     <button class="st ${on?'on':''}" data-star="${r.s}" aria-label="관심종목">${on?'★':'☆'}</button></div>`;
 }
@@ -1133,7 +1134,26 @@ function renderPick(){
     + `<p class="note">분류 기준: 환경 = 업종의 거시 순풍·역풍 점수(섹터 화면과 같음), 흐름 = 50일 평균 대비 위치와 3개월 수익률. ☆를 누르면 내 관심종목에 추가돼요.</p>`;
 }
 /* ---- 일정 탭 ---- */
-let EVENTS=null, calMine=false;
+let EVENTS=null, calMine=false, FLOWS=null;
+async function loadFlows(){ try{ const r=await fetch('flows.json?t='+Date.now(),{cache:'no-store'}); if(r.ok) FLOWS=await r.json(); }catch(_){} }
+const eok = x=> { const a=Math.abs(x); const t = a>=10000? (a/10000).toFixed(1)+'조' : Math.round(a).toLocaleString('ko-KR')+'억'; return (x>0?'+':x<0?'-':'')+t; };
+function flowOf(sym){ const m=sym.match(/^(\d{6})\.K[SQ]$/); return m&&FLOWS&&FLOWS.stocks? FLOWS.stocks[m[1]] : null; }
+function targetOf(sym){ const m=sym.match(/^(\d{6})\.K[SQ]$/); return m&&FLOWS&&FLOWS.target? FLOWS.target[m[1]] : null; }
+function flowSum(sym,n=5){ const f=flowOf(sym); if(!f||!f.length) return null; const r=f.slice(0,n); const v=k=>r.reduce((a,x)=>a+(x[k]||0)*(x.close||0),0)/1e8; return {frg:v('frg'),inst:v('inst'),ind:v('ind'),hold:r[0].hold}; }
+function renderFlowLine(){
+  const k=FLOWS&&FLOWS.index&&FLOWS.index.KOSPI&&FLOWS.index.KOSPI[0]; if(!k){ $('flowLine').innerHTML=''; return; }
+  const d=k.date? `${+k.date.slice(4,6)}/${+k.date.slice(6)}` : '';
+  const who = k.frg<0&&k.inst<0 ? '외국인과 기관이 함께 팔고 개인이 받아냈어요. 큰손이 빠지는 날은 지수가 약한 경우가 많아요.' : k.frg>0&&k.inst>0 ? '외국인과 기관이 함께 샀어요. 지수에 힘이 실리는 흐름이에요.' : k.frg>0 ? '외국인이 샀어요. 외국인 매수는 보통 원화 강세와 같이 와요.' : '외국인이 팔았어요. 외국인 매도가 이어지면 원/달러가 오르기 쉬워요.';
+  $('flowLine').innerHTML = `<b>코스피 수급 ${d}</b> 외국인 <span class="${dirCls(k.frg)}">${eok(k.frg)}</span> · 기관 <span class="${dirCls(k.inst)}">${eok(k.inst)}</span> · 개인 <span class="${dirCls(k.ind)}">${eok(k.ind)}</span><br><span class="note">${who}</span>`;
+}
+function flowHtml(sym){
+  const f=flowOf(sym); if(!f||!f.length) return '';
+  const fs5=flowSum(sym,5), tg=targetOf(sym), m=METRICS[sym];
+  const rows=f.slice(0,5).map(x=>`<tr><td>${+x.date.slice(4,6)}/${+x.date.slice(6)}</td><td class="${dirCls(x.frg)}">${eok(x.frg*x.close/1e8)}</td><td class="${dirCls(x.inst)}">${eok(x.inst*x.close/1e8)}</td><td class="${dirCls(x.ind)}">${eok(x.ind*x.close/1e8)}</td></tr>`).join('');
+  return `<div class="hold"><b>누가 사고 팔았나</b> <span class="note">최근 5일 순매수 (원화 환산 추정)</span>
+    <table style="width:100%;font-size:13px;font-variant-numeric:tabular-nums;margin-top:6px"><tr class="note"><td>날짜</td><td>외국인</td><td>기관</td><td>개인</td></tr>${rows}</table>
+    <div class="note" style="margin-top:6px">5일 합계: 외국인 ${eok(fs5.frg)}, 기관 ${eok(fs5.inst)}${fs5.hold?` · 외국인 보유 비중 ${fs5.hold}`:''}${tg&&m?` · 증권사 평균 목표가 ${tg.tp.toLocaleString('ko-KR')}원 (지금보다 ${pct((tg.tp/m.last-1)*100,0)})`:''}</div></div>`;
+}
 async function loadEvents(){
   try{ const r=await fetch('events.json?t='+Date.now(),{cache:'no-store'}); if(r.ok) EVENTS=await r.json(); }catch(_){}
 }
@@ -1331,7 +1351,7 @@ function drawModal(){
   const st=[['현재',fmtPrice(sym,m.last)+' '+meta.unit],['1일',fmtChg(sym,m.d1)],['1주',fmtChg(sym,m.d5)],['1개월',fmtChg(sym,m.m1)],['3개월',fmtChg(sym,m.m3)],['1년',fmtChg(sym,m.y1)],
     ['52주 고/저',fmtPrice(sym,m.hi)+' / '+fmtPrice(sym,m.lo)],['50일선 대비',meta.kind==='pct'?pct(m.vsMa50):fmtChg(sym,m.vsMa50)],['오늘 움직임 강도',(m.z1==null?'–':Math.abs(m.z1).toFixed(1)+'σ')],['연 변동성',meta.kind==='pct'?m.volAnn.toFixed(1)+'%':meta.kind==='yield'?Math.round(m.volAnn*100)+'bp':m.volAnn.toFixed(2)]];
   $('mStats').innerHTML = st.map(([a,b])=>`<div>${a}<b>${b}</b></div>`).join('');
-  $('mHold').innerHTML = holdForm(sym);
+  $('mHold').innerHTML = flowHtml(sym) + holdForm(sym);
   if($('hSave')) $('hSave').onclick=()=>{ const q=parseFloat($('hQ').value), p=parseFloat($('hP').value); PREFS.hold=PREFS.hold||{}; if(q>0){ PREFS.hold[sym]={q,p:p>0?p:0}; if(!PREFS.watch.includes(sym)) PREFS.watch.push(sym); } else delete PREFS.hold[sym]; applyPrefs(); drawModal(); };
   if($('hDel')) $('hDel').onclick=()=>{ delete PREFS.hold[sym]; applyPrefs(); drawModal(); };
   const rel = INSIGHTS.filter(x=>x.syms.includes(sym));
@@ -1504,7 +1524,7 @@ async function refresh(){
   METRICS={}; for(const s of Object.keys(META)){ const m=metrics(s,DATA[s]); if(m) METRICS[s]=m; }
   INSIGHTS = buildInsights(METRICS);
   try{ PREV = computePrev(res.items); }catch(e){ PREV=null; console.warn(e); }
-  if(SRC!=='api'){ await loadNews(); await loadReport(); await loadEvents(); }
+  if(SRC!=='api'){ await loadNews(); await loadReport(); await loadEvents(); await loadFlows(); }
   const st=$('status');
   if(MODE==='live'){ st.className='badge live'; st.textContent= SRC==='static'?'실제 시세':'실시간(약 15분 지연)'; }
   else { st.className='badge demo'; st.textContent='데모 데이터'; st.title='로컬 서버(node server.js)로 실행하면 실제 시세를 받아옵니다'; }

@@ -12,8 +12,8 @@ const num = v => v == null ? null : +String(v).replace(/[,+]/g, '');
   const out = process.argv[2] || 'public/flows.json', prevUrl = process.argv[3];
   let prev = null;
   if (prevUrl) { try { const r = await fetch(prevUrl, { cache: 'no-store' }); if (r.ok) prev = await r.json(); } catch (_) {} }
-  if (prev && prev.v === 2 && prev.fetchedAt && Date.now() - prev.fetchedAt < REFRESH_MS && process.env.FORCE_FLOWS !== '1') { fs.writeFileSync(out, JSON.stringify(prev)); console.log('수급: 재사용'); return; }
-  const res = { v: 2, fetchedAt: Date.now(), index: {}, stocks: {} };
+  if (prev && prev.v === 3 && prev.fetchedAt && Date.now() - prev.fetchedAt < REFRESH_MS && process.env.FORCE_FLOWS !== '1') { fs.writeFileSync(out, JSON.stringify(prev)); console.log('수급: 재사용'); return; }
+  const res = { v: 3, fetchedAt: Date.now(), index: {}, stocks: {} };
   for (const idx of ['KOSPI', 'KOSDAQ']) {
     try {
       const j = await get(`https://m.stock.naver.com/api/index/${idx}/integration`);
@@ -27,14 +27,13 @@ const num = v => v == null ? null : +String(v).replace(/[,+]/g, '');
   const sb = html.slice(html.indexOf('const SECTORS = ['), html.indexOf('const STOCK_SECTOR'));
   const kr = [...new Set([...sb.matchAll(/\['(\d{6})\.K[SQ]','[^']+'\]/g)].map(m => m[1]))];
   try { for (const x of JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'config', 'extra-stocks.json'), 'utf8'))) { const m = x.sym.match(/^(\d{6})\.K[SQ]$/); if (m && !kr.includes(m[1])) kr.push(m[1]); } } catch (_) {}
-  let first = true;
-  for (const code of kr) {
+    for (const code of kr) {
     try {
       const j = await get(`https://m.stock.naver.com/api/stock/${code}/integration`);
       const d = j.dealTrendInfos || [];
-      if (first) { console.log('IR일정 예시:', JSON.stringify(j.irScheduleInfo).slice(0, 500), '| 주총:', JSON.stringify(j.shareholdersMeetingInfo).slice(0, 300), '| 컨센서스:', JSON.stringify(j.consensusInfo).slice(0, 300)); first = false; }
-      if (j.irScheduleInfo) res.ir = res.ir || {}, res.ir[code] = j.irScheduleInfo;
-      res.stocks[code] = d.slice(0, 10).map(x => ({ date: x.bizdate, frg: num(x.foreignerPureBuyQuant), inst: num(x.organPureBuyQuant), ind: num(x.individualPureBuyQuant), hold: x.foreignerHoldRatio || null }));
+      if (j.irScheduleInfo) (res.ir = res.ir || {})[code] = j.irScheduleInfo;
+      res.stocks[code] = d.slice(0, 10).map(x => ({ date: x.bizdate, frg: num(x.foreignerPureBuyQuant), inst: num(x.organPureBuyQuant), ind: num(x.individualPureBuyQuant), close: num(x.closePrice), hold: x.foreignerHoldRatio || null }));
+      if (j.consensusInfo && j.consensusInfo.priceTargetMean) (res.target = res.target || {})[code] = { tp: num(j.consensusInfo.priceTargetMean), rec: +j.consensusInfo.recommMean || null, date: j.consensusInfo.createDate };
     } catch (e) { console.log('수급', code, '실패', e.message); }
     await sleep(150);
   }
