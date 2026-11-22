@@ -38,6 +38,9 @@ jobs:
       - name: 뉴스 받아오기
         run: node scripts/fetch-news.js public/news.json "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/news.json"
         continue-on-error: true
+      - name: 외국인·기관 매매 동향 받아오기
+        run: node scripts/fetch-flows.js public/flows.json "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/flows.json"
+        continue-on-error: true
       - name: 실적·거시 일정 받아오기
         run: node scripts/fetch-events.js public/events.json "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/events.json"
         continue-on-error: true
