@@ -43,7 +43,8 @@ async function fetchTopic(q, lang = 'ko') {
 
   let prev = null;
   if (prevUrl) { try { prev = await (await fetch(prevUrl, { cache: 'no-store' })).json(); } catch (e) { console.log('이전 뉴스 없음'); } }
-  if (prev && prev.fetchedAt && Date.now() - prev.fetchedAt < REFRESH_MS && process.env.FORCE_NEWS !== '1') {
+  const sameTopics = prev && prev.topics && Object.keys(topics).every(k => k in prev.topics);
+  if (sameTopics && prev.fetchedAt && Date.now() - prev.fetchedAt < REFRESH_MS && process.env.FORCE_NEWS !== '1') {
     fs.writeFileSync(out, JSON.stringify(prev));
     console.log('뉴스: 최근 것 재사용 (', Math.round((Date.now() - prev.fetchedAt) / 60000), '분 전 수집)');
     return;
