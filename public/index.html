@@ -1188,6 +1188,7 @@ function askButtons(prompt){
   const q=encodeURIComponent(prompt);
   return `<a class="askb pplx" href="https://www.perplexity.ai/search?q=${q}" target="_blank" rel="noopener noreferrer">Perplexity로 분석 받기</a>
     <a class="askb" href="https://claude.ai/new?q=${q}" target="_blank" rel="noopener noreferrer">Claude로 분석 받기</a>
+    <a class="askb" href="https://chatgpt.com/?hints=search&q=${q}" target="_blank" rel="noopener noreferrer">ChatGPT로 분석 받기</a>
     <button class="askb" data-copy="1">질문 복사</button>`;
 }
 let LAST_PROMPT='';
