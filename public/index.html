@@ -37,7 +37,7 @@ nav.sec::-webkit-scrollbar{display:none}
 .tabs{display:flex;gap:4px;margin:0 0 8px;background:var(--surface-2);border-radius:10px;padding:3px}
 .tabs button{flex:1;min-height:36px;border:0;border-radius:8px;background:none;color:var(--text-secondary);font-size:14px;font-weight:600;cursor:pointer}
 .tabs button.on{background:var(--surface-1);color:var(--text-primary);box-shadow:0 1px 3px rgba(0,0,0,.15)}
-body.pick nav.sec, body.pick #tab-mkt, body.cal nav.sec, body.cal #tab-mkt, body.hold nav.sec, body.hold #tab-mkt{display:none} body:not(.pick) #tab-pick{display:none} body:not(.cal) #tab-cal{display:none} body:not(.hold) #tab-hold{display:none}
+body.pick nav.sec, body.pick #tab-mkt, body.cal nav.sec, body.cal #tab-mkt, body.hold nav.sec, body.hold #tab-mkt, body.rev nav.sec, body.rev #tab-mkt{display:none} body:not(.rev) #tab-rev{display:none} body:not(.pick) #tab-pick{display:none} body:not(.cal) #tab-cal{display:none} body:not(.hold) #tab-hold{display:none}
 .tabs button{font-size:13.5px;white-space:nowrap;padding:0 4px}
 #hSearch{width:100%;min-height:44px;padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary);font-size:16px;box-sizing:border-box}
 .sres{margin-top:6px} .sres .r{display:flex;align-items:center;gap:8px;padding:10px 6px;border-bottom:1px solid var(--border);cursor:pointer} .sres .r .n{flex:1;min-width:0} .sres .r small{color:var(--text-muted);margin-left:4px}
@@ -269,6 +269,18 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
   .chartwrap svg{height:240px}
   .stats{grid-template-columns:1fr 1fr 1fr}
 }
+
+.rfil{display:block} .rfr{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0} .rfr>span{font-size:12px;color:var(--text-muted);min-width:62px}
+.rfr button{white-space:nowrap} .rmore{margin:6px 0} .rmore summary{font-size:13px;color:var(--text-muted);cursor:pointer;padding:4px 0}
+.rrow{background:var(--surface-1);border:1px solid var(--grid);border-radius:12px;padding:10px 12px;margin:8px 0;cursor:pointer}
+.ra{display:flex;align-items:center;gap:8px;flex-wrap:wrap} .ra .spacer{flex:1} .rsc{font-size:20px;white-space:nowrap} .rsc small{font-size:12px;color:var(--text-muted);font-weight:400}
+.newb{background:#e8590c;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;letter-spacing:.3px}
+.rbar{position:relative;height:6px;background:var(--grid);border-radius:4px;margin:6px 0;overflow:hidden} .rbar u{position:absolute;left:0;top:0;bottom:0;background:var(--grid);filter:brightness(.85)} .rbar i{position:absolute;left:0;top:0;bottom:0;background:var(--up);z-index:1;border-radius:4px}
+.rb{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12.5px} .rb em{font-style:normal}
+.na{color:var(--text-muted);font-size:11px} .ok{color:var(--accent);font-weight:700} .no{color:var(--down)}
+.rit{list-style:none;padding:0;margin:8px 0;display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;font-size:13px} .rit li{display:flex;justify-content:space-between}
+@media(max-width:520px){.rit{grid-template-columns:1fr}}
+.rst{margin-top:8px}
 </style>
 </head>
 <body>
@@ -281,7 +293,7 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
     <button id="theme" title="밝게/어둡게" aria-label="밝게/어둡게">◐</button>
   </div>
   <div class="note" id="updated" style="margin:-4px 0 6px"></div>
-  <div class="tabs" role="tablist"><button data-tab="mkt" class="on">시장</button><button data-tab="pick">종목 발굴</button><button data-tab="cal">일정</button><button data-tab="hold">내 보유</button></div>
+  <div class="tabs" role="tablist"><button data-tab="mkt" class="on">시장</button><button data-tab="pick">종목 발굴</button><button data-tab="cal">일정</button><button data-tab="hold">내 보유</button><button data-tab="rev">상승 전환</button></div>
   <nav class="sec" id="secnav"></nav>
 </header>
 <div id="cfgBanner"></div>
@@ -294,6 +306,11 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
     <div class="pbox" style="margin-top:6px"><h3>종목 검색해서 등록</h3><p class="pd">한국·미국 상장 종목 이름이나 코드로 찾아서 수량과 평단가를 넣으세요. 이 기기에만 저장돼요.</p>
       <input id="hSearch" type="search" placeholder="예: 삼성전자, 005930, 테슬라, TSLA" autocomplete="off"><div class="sres" id="hRes"></div><div id="hForm"></div></div>
     <div id="holdList"></div>
+  </div>
+  <div id="tab-rev">
+    <div class="disc"><b>"상승 전환 후보 찾기"</b>예요. 오래 내리거나 옆으로 기던 종목 중 다시 오르기 시작하는 조건(10가지, 100점)을 얼마나 채웠는지 기계적으로 계산했어요. <b>점수는 오를 확률이 아니라 조건 충족도</b>이고, 하루 2번(장 마감 뒤) 종가로 계산해서 실시간이 아니에요.</div>
+    <div class="filters rfil" id="revF"></div>
+    <div id="rev"></div>
   </div>
   <div id="tab-cal">
     <div class="filters" id="calF"></div>
@@ -371,6 +388,7 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
     </div>
     <div class="chartwrap"><svg id="mChart"></svg><div class="tip" id="mTip"></div></div>
     <div class="stats" id="mStats"></div>
+    <div id="mRev"></div>
     <div id="mHold"></div>
     <div id="mIns"></div>
     <div id="mTbl"></div>
@@ -1110,7 +1128,7 @@ function drawSector(){
 }
 /* ---- 종목 고르기 탭 ---- */
 function setTab(t){
-  ['pick','cal','hold'].forEach(k=>document.body.classList.toggle(k, t===k)); if(t==='hold') loadUniverse();
+  ['pick','cal','hold','rev'].forEach(k=>document.body.classList.toggle(k, t===k)); if(t==='hold') loadUniverse(); if(t==='rev') loadRev();
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===t));
   try{ localStorage.setItem('cmTab', t); }catch(_){}
   window.scrollTo(0,0);
@@ -1625,6 +1643,7 @@ function drawModal(){
   const st=[['현재',fmtPrice(sym,m.last)+' '+meta.unit],['1일',fmtChg(sym,m.d1)],['1주',fmtChg(sym,m.d5)],['1개월',fmtChg(sym,m.m1)],['3개월',fmtChg(sym,m.m3)],['1년',fmtChg(sym,m.y1)],
     ['52주 고/저',fmtPrice(sym,m.hi)+' / '+fmtPrice(sym,m.lo)],['50일선 대비',meta.kind==='pct'?pct(m.vsMa50):fmtChg(sym,m.vsMa50)],['오늘 움직임 강도',(m.z1==null?'–':Math.abs(m.z1).toFixed(1)+'σ')],['연 변동성',meta.kind==='pct'?m.volAnn.toFixed(1)+'%':meta.kind==='yield'?Math.round(m.volAnn*100)+'bp':m.volAnn.toFixed(2)]];
   $('mStats').innerHTML = st.map(([a,b])=>`<div>${a}<b>${b}</b></div>`).join('');
+  $('mRev').innerHTML = revPanel(sym);
   $('mHold').innerHTML = flowHtml(sym) + holdForm(sym);
   if($('hSave')) $('hSave').onclick=()=>{ const q=parseFloat($('hQ').value), p=parseFloat($('hP').value); PREFS.hold=PREFS.hold||{}; if(q>0){ PREFS.hold[sym]={q,p:p>0?p:0,name:META[sym].name}; if(!PREFS.watch.includes(sym)) PREFS.watch.push(sym); } else delete PREFS.hold[sym]; applyPrefs(); drawModal(); };
   if($('hDel')) $('hDel').onclick=()=>{ delete PREFS.hold[sym]; applyPrefs(); drawModal(); };
@@ -1635,6 +1654,114 @@ function drawModal(){
   const starred = PREFS.watch.includes(sym);
   $('mStar').textContent = starred?'★ 관심종목':'☆ 관심종목 추가'; $('mStar').className = starred?'on':'';
   $('mTbl').innerHTML = showTable? `<table class="tbl"><tr><th>날짜</th><th>종가</th><th>전일 대비</th></tr>${c.map((v,i)=>[i,v]).reverse().slice(0,60).map(([i,v])=>`<tr><td>${yfmt(t[i])}</td><td>${fmtPrice(sym,v)}</td><td class="${dirCls(i?v-c[i-1]:0)}">${i?fmtChg(sym,meta.kind==='pct'?(v/c[i-1]-1)*100:v-c[i-1]):''}</td></tr>`).join('')}</table>` : '';
+}
+
+/* ---- 상승 전환 후보 찾기 (독립 모듈: reversal.json / revseries.json만 사용) ---- */
+let REV=null, REVS=null, REV_ERR=null, revLoading=null;
+const REV_DEF={mk:'all',ex:'all',sec:'all',cap:'all',L:126,min:60,vm:1.5,fin:false,stage:'2',sort:'score'};
+let RF=Object.assign({},REV_DEF); try{ Object.assign(RF, JSON.parse(localStorage.getItem('cmRev')||'{}')); }catch(_){}
+const saveRF=()=>{ try{ localStorage.setItem('cmRev',JSON.stringify(RF)); }catch(_){} };
+function loadRev(){
+  if(revLoading) return revLoading;
+  revLoading = (async()=>{
+    try{ const r=await fetch('reversal.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); REV=await r.json(); REV_ERR=null; }
+    catch(e){ REV_ERR = MODE==='demo'||SRC==='api' ? '로컬 화면에서는 스캔 결과가 없어요. 사이트에서 확인해 주세요.' : '스캔 결과를 아직 못 받았어요. 장 마감 뒤 하루 2번 만들어져요.'; }
+    renderRev();
+  })();
+  return revLoading;
+}
+async function loadRevSeries(){ if(REVS) return REVS; try{ const r=await fetch('revseries.json?t='+Date.now(),{cache:'no-store'}); if(r.ok) REVS=await r.json(); }catch(_){} return REVS||{}; }
+const revKey=()=>`${RF.L}_${RF.vm}`;
+const REV_NEW={stage2:'최근 5거래일 안에 2단계 첫 진입',jump:'어제보다 점수 크게 상승',ma60:'60일선 첫 회복',brkvol:'거래량 동반 저항 돌파'};
+const revV=(x,k)=>{ const a=x.V&&x.V[k||revKey()]; return a? {sc:a[0],cov:a[1],st:a[2],it:a[3],first2:a[4],nw:a[5]||[],dl:a[6],up:a[7],volx:a[8]} : null; };
+const revIt=(v,key)=>{ const i=REV.keys.indexOf(key); const ch=v.it[i]; return ch==='2'?null:ch==='1'; };
+const capTier=x=>{ const big=x.cur==='KRW'?1e13:1e10, mid=x.cur==='KRW'?1e12:2e9; return x.cap>=big?'L':x.cap>=mid?'M':'S'; };
+function revRows(){
+  if(!REV) return [];
+  const out=[];
+  for(const x of REV.list){
+    const v=revV(x); if(!v) continue;
+    if(RF.mk==='kr'&&x.cur!=='KRW') continue; if(RF.mk==='us'&&x.cur!=='USD') continue;
+    if(RF.ex!=='all'&&x.mk!==RF.ex) continue;
+    if(RF.sec!=='all'&&x.sec!==RF.sec) continue;
+    if(RF.cap!=='all'&&capTier(x)!==RF.cap) continue;
+    if(v.sc<RF.min) continue;
+    if(RF.stage!=='all'&&String(v.st)!==RF.stage) continue;
+    if(RF.fin&&!(revIt(v,'fin')===true||revIt(v,'eps')===true)) continue;
+    out.push({x,v});
+  }
+  out.sort((a,b)=> RF.sort==='new' ? ((b.v.nw.length>0)-(a.v.nw.length>0)) || b.v.sc-a.v.sc : b.v.sc-a.v.sc || (b.v.nw.length>0)-(a.v.nw.length>0));
+  return out;
+}
+const revPx=(x,p)=> p==null?'–': x.cur==='KRW'? Math.round(p).toLocaleString('ko-KR')+'원' : '$'+(+p).toLocaleString('en-US',{maximumFractionDigits:2});
+const revMd=s=> s? (+s.slice(5,7))+'/'+(+s.slice(8,10)) : '–';
+const ynN=b=> b==null?'<span class="na">N/A</span>': b?'<span class="ok">✓</span>':'<span class="no">✗</span>';
+const STG={0:'해당 없음',1:'1단계 바닥 다지기',2:'2단계 전환 시도',3:'3단계 추세 확인'};
+function revChips(name,opts,cur){ return opts.map(([v,l])=>`<button class="${String(cur)===String(v)?'on':''}" data-rf="${name}" data-rv="${v}">${l}</button>`).join(''); }
+function renderRev(){
+  const el=$('rev'); if(!el) return;
+  if(!REV){ el.innerHTML = `<div class="empty">${REV_ERR||'불러오는 중…'}</div>`; $('revF').innerHTML=''; return; }
+  const exOpts = RF.mk==='kr'?[['all','전체'],['KOSPI','코스피'],['KOSDAQ','코스닥']] : RF.mk==='us'?[['all','전체'],['NASDAQ','나스닥'],['NYSE','NYSE']] : [['all','전체'],['KOSPI','코스피'],['KOSDAQ','코스닥'],['NASDAQ','나스닥'],['NYSE','NYSE']];
+  const secs=[...new Set(REV.list.filter(x=>RF.mk==='all'||(RF.mk==='kr')===(x.cur==='KRW')).map(x=>x.sec).filter(Boolean))].sort();
+  $('revF').innerHTML = `<div class="rfr"><span>시장</span>${revChips('mk',[['all','전체'],['kr','국장'],['us','미장']],RF.mk)}</div>
+    <div class="rfr"><span>거래소</span>${revChips('ex',exOpts,RF.ex)}</div>
+    <div class="rfr"><span>단계</span>${revChips('stage',[['1','1단계'],['2','2단계'],['3','3단계'],['all','전체']],RF.stage)}</div>
+    <div class="rfr"><span>최소 점수</span>${revChips('min',[['0','제한 없음'],['60','60+'],['70','70+'],['80','80+']],RF.min)}</div>
+    <details class="rmore"><summary>필터 더 보기 · 시총, 업종, 기간, 거래량, 실적</summary>
+    <div class="rfr"><span>시가총액</span>${revChips('cap',[['all','전체'],['L','대형'],['M','중형'],['S','소형']],RF.cap)}</div>
+    <div class="rfr"><span>분석 기간</span>${revChips('L',[['63','3개월'],['126','6개월'],['252','12개월']],RF.L)}</div>
+    <div class="rfr"><span>거래량 기준</span>${revChips('vm',[['1.5','평소의 1.5배'],['2','2배']],RF.vm)}</div>
+    <div class="rfr"><span>실적</span>${revChips('fin',[['false','상관없음'],['true','실적 개선만']],RF.fin)}</div>
+    <div class="rfr"><span>업종</span><select id="revSec"><option value="all">전체</option>${secs.map(s=>`<option ${RF.sec===s?'selected':''}>${esc(s)}</option>`).join('')}</select></div>
+    <p class="note">시총 기준: 대형 10조원·100억달러 이상, 중형 1조원·20억달러 이상. 업종은 지금 미국 종목만 나뉘어 있어요.</p></details>
+    <div class="rfr"><span>정렬</span>${revChips('sort',[['score','점수순'],['new','NEW REVERSAL 먼저']],RF.sort)}<button class="sm" data-rf="reset" data-rv="1">초기화</button></div>`;
+  const rows=revRows(), top=rows.slice(0,20);
+  const sc=new Date(REV.scannedAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  const head=`<p class="note">스캔 ${sc} · 종가 기준 (한국 ${revMd(REV.asOf.KR)}, 미국 ${revMd(REV.asOf.US)}) · 시총 상위 한국 ${REV.universe.KR}·미국 ${REV.universe.US}종목 중 조건 맞는 ${rows.length}개, 위에서 20개</p>`;
+  el.innerHTML = head + (top.length? top.map(({x,v})=>{
+    const isNew=v.nw.length>0, fin=revIt(v,'fin'), eps=revIt(v,'eps'), flow=revIt(v,'flow');
+    const fv = fin===true||eps===true ? true : (fin===false||eps===false) ? false : null;
+    return `<div class="rrow" data-rev="${esc(x.s)}">
+      <div class="ra"><span class="nmh">${x.cur==='KRW'?'<span class="mk kr">국장</span>':'<span class="mk us">미장</span>'}${esc(x.n)}</span>${isNew?`<span class="newb" title="${esc(v.nw.map(k=>REV_NEW[k]).join(', '))}">NEW REVERSAL</span>`:''}<span class="spacer"></span><b class="rsc">${v.sc}<small>/100</small></b></div>
+      <div class="rbar"><i style="width:${v.sc}%"></i><u style="width:${v.cov}%"></u></div>
+      <div class="rb"><span>${revPx(x,x.px)} <em class="${x.d1>=0?'up':'down'}">${x.d1>=0?'+':''}${x.d1}%</em></span><span>${STG[v.st]}</span><span>저점 대비 +${v.up}%</span><span>거래량 ${v.volx!=null?v.volx.toFixed(1)+'배':'–'}</span><span>실적 ${ynN(fv)}</span><span>수급 ${ynN(flow)}</span><span>첫 신호 ${revMd(v.first2)}</span><span class="note">데이터 ${v.cov}%</span></div></div>`; }).join('')
+    : `<div class="empty">지금 조건에 맞는 종목이 없어요. 단계를 '전체'로 바꾸거나 최소 점수를 낮춰 보세요.</div>`);
+  if($('revSec')) $('revSec').onchange=e=>{ RF.sec=e.target.value; saveRF(); renderRev(); };
+}
+function revSetF(k,v){
+  if(k==='reset'){ RF=Object.assign({},REV_DEF); }
+  else { RF[k] = k==='L'||k==='min'||k==='vm' ? +v : k==='fin' ? v==='true' : v; if(k==='mk'){ RF.ex='all'; RF.sec='all'; } }
+  saveRF(); renderRev();
+}
+async function openRev(sym){
+  const x=REV&&REV.list.find(y=>y.s===sym); if(!x) return;
+  const S=await loadRevSeries(), sr=S[sym];
+  if(!META[sym]) META[sym]={group:'rev',sym,name:x.n,unit:x.cur==='KRW'?'₩':'$',kind:'pct',why:(x.sec||'')+' · '+x.mk,stock:true,rev:true};
+  if(!DATA[sym]||!METRICS[sym]){ if(!sr) return; DATA[sym]={t:sr.t.map(z=>z*60),c:sr.c}; const m=metrics(sym,DATA[sym]); if(m) METRICS[sym]=m; }
+  openModal(sym);
+}
+function revPanel(sym){
+  const x=REV&&REV.list.find(y=>y.s===sym); if(!x) return '';
+  const v=revV(x); if(!v) return '';
+  const d=x.det;
+  const items=REV.keys.map(k=>{ const b=revIt(v,k); return `<li><span>${ynN(b)} ${REV.labels[k]}</span><b>${b?REV.pts[k]:0}/${REV.pts[k]}</b></li>`; }).join('');
+  const L={63:'3개월',126:'6개월',252:'12개월'}[RF.L];
+  return `<div class="pbox revp"><h3>상승 전환 체크 <span class="note">(${L} · 거래량 ${RF.vm}배 기준)</span></h3>
+    <div class="ra"><b class="rsc">${v.sc}<small>/100점</small></b><span>${STG[v.st]}</span>${v.nw.length?`<span class="newb">NEW REVERSAL</span>`:''}<span class="spacer"></span><span class="note">데이터 ${v.cov}%</span></div>
+    ${v.nw.length?`<p class="pd">새 신호: ${v.nw.map(k=>REV_NEW[k]).join(', ')}</p>`:''}
+    <ul class="rit">${items}</ul>
+    <div class="stats rst">
+      <div>최근 저점<b>${revMd(d.low[0])} · ${revPx(x,d.low[1])}</b></div>
+      <div>저점 상승(Higher Low)<b>${d.hl?revMd(d.hl[0])+' · '+revPx(x,d.hl[1]):'아직 없음'}</b></div>
+      <div>돌파 기준 고점<b>${d.refHi?revPx(x,d.refHi[1]):'–'}${d.brk?' · '+revMd(d.brk)+' 돌파':''}</b></div>
+      <div>골든크로스(20일선이 60일선 위로)<b>${d.gc?revMd(d.gc):'최근 없음'}</b></div>
+      <div>60일선 회복<b>${d.ma60x?revMd(d.ma60x):'최근 없음'}</b></div>
+      <div>거래량 (20일 평균 대비)<b>${d.volx!=null?d.volx.toFixed(1)+'배':'–'}</b></div>
+      <div>20 / 60 / 120일선<b>${revPx(x,d.ma20)} / ${revPx(x,d.ma60)} / ${revPx(x,d.ma120)}</b></div>
+      <div>RSI(14)<b>${d.rsi}</b></div></div>
+    <p class="pd">실적: ${esc(d.fin||'N/A (데이터 없음)')}<br>전망: ${esc(d.eps||'N/A (데이터 없음)')}<br>수급: ${esc(d.flow||(x.cur==='USD'?'N/A (미국 종목은 수급 데이터 없음)':'N/A (데이터 없음)'))}</p>
+    <h3 style="margin-top:10px">전환 실패 위험 신호</h3>${d.risk&&d.risk.length?`<ul class="tl">${d.risk.map(r=>`<li>⚠️ ${esc(r)}</li>`).join('')}</ul>`:'<p class="pd">지금 보이는 위험 신호는 없어요.</p>'}
+    <p class="note">점수는 오를 확률이 아니라 10가지 조건 중 몇 개를 채웠는지예요. N/A는 데이터가 없어 0점 처리한 항목입니다. ${revMd(x.asOf)} 종가 기준.</p></div>`;
 }
 
 /* ---- 메인 ---- */
@@ -1828,6 +1955,8 @@ document.addEventListener('click', e=>{
   const ps=t.closest('[data-psec]'); if(ps){ pickSec=ps.dataset.psec; try{localStorage.setItem('cmPickSec',pickSec);}catch(_){} renderPick(); return; }
   const pm=t.closest('[data-pmk]'); if(pm){ pickMkt=pm.dataset.pmk; try{localStorage.setItem('cmPickMkt',pickMkt);}catch(_){} renderPick(); return; }
   const cf=t.closest('[data-calf]'); if(cf){ calMine=cf.dataset.calf==='mine'; renderCal(); return; }
+  const rf=t.closest('[data-rf]'); if(rf){ revSetF(rf.dataset.rf, rf.dataset.rv); return; }
+  const rv=t.closest('[data-rev]'); if(rv){ openRev(rv.dataset.rev); return; }
   const tb=t.closest('[data-tab]'); if(tb){ setTab(tb.dataset.tab); return; }
   const star=t.closest('[data-star]'); if(star){ const s=star.dataset.star; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); return; }
   const so=t.closest('[data-sec-open]'); if(so){ openSector(so.dataset.secOpen); return; }
@@ -1841,7 +1970,7 @@ document.addEventListener('click', e=>{
 document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ if($('modal').classList.contains('open')) closeModal(); else { $('edit').classList.remove('open'); $('secm').classList.remove('open'); } } if(e.key==='Enter'&&e.target.dataset&&e.target.dataset.sym) openModal(e.target.dataset.sym); });
 $('mClose').onclick=closeModal;
 $('mStar').onclick=()=>{ const s=curSym; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); drawModal(); };
-try{ const tb0=['#pick','#cal','#hold'].includes(location.hash)?location.hash.slice(1):localStorage.getItem('cmTab'); if(tb0==='pick'||tb0==='cal'||tb0==='hold') setTab(tb0); }catch(_){}
+try{ const tb0=['#pick','#cal','#hold','#rev'].includes(location.hash)?location.hash.slice(1):localStorage.getItem('cmTab'); if(['pick','cal','hold','rev'].includes(tb0)) setTab(tb0); }catch(_){}
 $('editBtn').onclick=()=>{ renderEdit(); $('edit').classList.add('open'); };
 $('sClose').onclick=()=>$('secm').classList.remove('open');
 $('eClose').onclick=()=>$('edit').classList.remove('open');
