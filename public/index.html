@@ -53,6 +53,13 @@ body.pick nav.sec, body.pick #tab-mkt, body.cal nav.sec, body.cal #tab-mkt{displ
 .prow .st{min-width:40px;min-height:40px;padding:0;font-size:18px;background:none;border:0;color:var(--text-muted)} .prow .st.on{color:var(--st-warn)}
 .tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:5px;margin-right:4px;background:var(--surface-2);color:var(--text-secondary)}
 .tag.g{color:var(--st-good)} .tag.b{color:var(--st-serious)}
+.acct{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin:0 0 10px}
+.acct .top{display:flex;gap:14px;flex-wrap:wrap;align-items:baseline} .acct .big{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.acct .k{font-size:12px;color:var(--text-muted)} .acct .v{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+.acct table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;font-variant-numeric:tabular-nums} .acct td{padding:6px 2px;border-top:1px solid var(--border)} .acct td:not(:first-child){text-align:right}
+.hold{margin:10px 0;padding:10px 12px;background:var(--surface-2);border-radius:10px;font-size:13px} .hold input{width:110px;min-height:36px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text-primary);font-size:15px}
+.hold label{display:inline-flex;gap:6px;align-items:center;margin:4px 10px 4px 0}
+#cfgBanner .bn{margin:10px 16px;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--st-warn);font-size:14px}
 .srank{display:flex;flex-wrap:wrap;gap:6px}
 .disc{font-size:12.5px;color:var(--text-secondary);background:var(--surface-2);border-radius:10px;padding:10px 12px;line-height:1.5;margin:10px 0}
 nav.sec a{flex:none;font-size:13px;color:var(--text-secondary);text-decoration:none;padding:6px 12px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border)}
@@ -269,6 +276,7 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
   <div class="tabs" role="tablist"><button data-tab="mkt" class="on">시장 보기</button><button data-tab="pick">종목 고르기</button><button data-tab="cal">일정</button></div>
   <nav class="sec" id="secnav"></nav>
 </header>
+<div id="cfgBanner"></div>
 <main>
   <div id="tab-pick">
     <div class="disc"><b>추천이 아니라 "살펴볼 후보"예요.</b> 지금의 거시 환경(금리·환율·원자재 흐름)과 주가 흐름만 보고 기계적으로 분류했습니다. 회사 실적, 가격 수준(비싼지 싼지), 내 상황은 반영하지 않았어요. 투자 결정은 꼭 직접 확인하고 내려 주세요.</div>
@@ -294,6 +302,7 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
 
   <section id="s-watch">
   <h2>내 관심종목 <span class="spacer"></span><button id="editBtn" class="sm">✎ 내 화면 편집</button></h2>
+  <div id="acct"></div>
   <div class="grid" id="watch"></div>
   </section>
 
@@ -348,6 +357,7 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
     </div>
     <div class="chartwrap"><svg id="mChart"></svg><div class="tip" id="mTip"></div></div>
     <div class="stats" id="mStats"></div>
+    <div id="mHold"></div>
     <div id="mIns"></div>
     <div id="mTbl"></div>
   </div>
@@ -367,7 +377,8 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
 <div class="modal" id="edit">
   <div class="panel" role="dialog" aria-modal="true" aria-label="내 화면 편집">
     <div class="hd"><h3>내 화면 편집</h3><span class="spacer"></span><button id="eReset">기본값으로</button><button id="eClose" class="on">완료</button></div>
-    <p class="note">이 기기(브라우저)에 저장됩니다. 핸드폰과 PC는 따로 설정돼요.</p>
+    <p class="note">이 기기(브라우저)에만 저장됩니다. 다른 기기로 옮기려면 아래 버튼으로 "설정 링크"를 만들어 그 기기에서 열어 주세요.</p>
+    <div class="askrow" style="margin:6px 0 4px"><button class="askb" id="eShare">다른 기기로 옮기기 (설정 링크 복사)</button></div>
     <h2>관심종목 순서 <small>맨 위에 이 순서대로 보입니다</small></h2>
     <div id="eWatch"></div>
     <h2>종목 추가·빼기 <small>눌러서 켜고 끄기</small></h2>
@@ -998,7 +1009,7 @@ function renderInsights(){
 }
 
 /* ---- 내 화면 설정 (localStorage) ---- */
-const DEFAULT_PREFS = { watch:['HG=F','CL=F','GC=F','KRW=X','^KS11','^TNX','CUGOLD','^VIX'], hidden:[], mine:false };
+const DEFAULT_PREFS = { watch:['HG=F','CL=F','GC=F','KRW=X','^KS11','^TNX','CUGOLD','^VIX'], hidden:[], mine:false, hold:{} };
 let PREFS = loadPrefs();
 function loadPrefs(){ try{ const p=JSON.parse(localStorage.getItem('cmPrefs')); if(p&&Array.isArray(p.watch)) return Object.assign({},DEFAULT_PREFS,p,{watch:p.watch.filter(s=>META[s])}); }catch(_){} return JSON.parse(JSON.stringify(DEFAULT_PREFS)); }
 function savePrefs(){ try{ localStorage.setItem('cmPrefs', JSON.stringify(PREFS)); }catch(_){} }
@@ -1193,7 +1204,50 @@ function renderAll(){
   document.querySelectorAll('details.fold').forEach(d=>{ if(!d.dataset.init){ d.dataset.init=1; d.open=OPEN.has(d.dataset.g); } });
   for(const [id] of SECTIONS){ const el=$(id); if(el) el.style.display=isHidden(id)?'none':''; }
 }
+/* ---- 내 보유 종목 ---- */
+function fxOf(s){ const u=META[s]&&META[s].unit; if(u==='₩') return 1; if(u==='$') return METRICS['KRW=X']?METRICS['KRW=X'].last:null; if(u==='€') return METRICS['KRWEUR']?METRICS['KRWEUR'].last:null; return null; }
+const won = x=> (x<0?'-':'')+'₩'+Math.round(Math.abs(x)).toLocaleString('ko-KR');
+const swon = x=> (x>0?'+':'')+won(x);
+function renderAcct(){
+  const H=PREFS.hold||{}, rows=[];
+  for(const [s,h] of Object.entries(H)){ const m=METRICS[s], fx=fxOf(s); if(!m||!fx||!(h.q>0)) continue;
+    const val=h.q*m.last*fx, cost=h.p>0?h.q*h.p*fx:null, today=h.q*(m.last-m.prev)*fx;
+    rows.push({s,h,val,cost,today}); }
+  if(!rows.length){ $('acct').innerHTML = `<div class="note" style="margin:0 0 8px">💡 종목을 눌러 <b>보유 수량과 평단가</b>를 넣으면 여기서 내 수익률과 오늘 손익을 볼 수 있어요. (이 기기에만 저장)</div>`; return; }
+  const sum=k=>rows.reduce((a,r)=>a+(r[k]||0),0), val=sum('val'), today=sum('today'), costRows=rows.filter(r=>r.cost), cost=costRows.reduce((a,r)=>a+r.cost,0), gain=costRows.reduce((a,r)=>a+r.val-r.cost,0);
+  rows.sort((a,b)=>b.val-a.val);
+  $('acct').innerHTML = `<div class="acct"><div class="k">내 계좌 · 원화 환산 (이 기기에만 저장)</div>
+    <div class="top"><span class="big">${won(val)}</span>
+    <span><span class="k">오늘</span> <span class="v ${dirCls(today)}">${swon(today)} (${pct(today/(val-today)*100)})</span></span>
+    ${cost?`<span><span class="k">총 손익</span> <span class="v ${dirCls(gain)}">${swon(gain)} (${pct(gain/cost*100)})</span></span>`:''}</div>
+    <table>${rows.map(r=>`<tr data-sym="${r.s}"><td>${nm(r.s)}</td><td class="${dirCls(r.today)}">${swon(r.today)}</td><td class="${r.cost?dirCls(r.val-r.cost):''}">${r.cost?pct((r.val/r.cost-1)*100):'–'}</td><td>${Math.round(r.val/val*100)}%</td></tr>`).join('')}</table>
+    <div class="note" style="margin-top:6px">오늘 · 수익률 · 비중 순. 해외 종목은 현재 환율로 환산해서 환율 변동 손익은 빠져 있어요.</div></div>`;
+}
+function holdForm(sym){
+  const meta=META[sym]; if(!meta||!meta.stock) return '';
+  const h=(PREFS.hold||{})[sym]||{};
+  return `<div class="hold"><b>내 보유</b> <span class="note">이 기기에만 저장돼요</span><br>
+    <label>수량 <input id="hQ" type="number" inputmode="decimal" min="0" step="any" value="${h.q||''}" placeholder="0"></label>
+    <label>평단가(${meta.unit}) <input id="hP" type="number" inputmode="decimal" min="0" step="any" value="${h.p||''}" placeholder="선택"></label>
+    <button class="sm" id="hSave">저장</button>${h.q?' <button class="sm" id="hDel">삭제</button>':''}</div>`;
+}
+/* ---- 다른 기기로 설정 옮기기 ---- */
+function cfgLink(){
+  const data={w:PREFS.watch,h:PREFS.hidden,m:PREFS.mine?1:0,o:PREFS.hold||{}};
+  const b64=btoa(unescape(encodeURIComponent(JSON.stringify(data)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  return location.origin+location.pathname+'#cfg='+b64;
+}
+function checkCfgLink(){
+  const m=location.hash.match(/^#cfg=([\w-]+)/); if(!m) return;
+  let d; try{ d=JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g,'+').replace(/_/g,'/'))))); }catch(_){ return; }
+  history.replaceState(null,'',location.pathname);
+  const nH=Object.keys(d.o||{}).length;
+  $('cfgBanner').innerHTML=`<div class="bn">다른 기기의 설정(관심종목 ${(d.w||[]).length}개${nH?', 보유 종목 '+nH+'개':''})을 이 기기에 불러올까요? 지금 이 기기의 설정은 바뀝니다.<div class="askrow" style="margin-top:8px"><button class="askb pplx" id="cfgYes">불러오기</button><button class="askb" id="cfgNo">취소</button></div></div>`;
+  $('cfgYes').onclick=()=>{ PREFS.watch=(d.w||[]).filter(s=>META[s]); PREFS.hidden=d.h||[]; PREFS.mine=!!d.m; PREFS.hold=d.o||{}; $('cfgBanner').innerHTML=''; applyPrefs(); };
+  $('cfgNo').onclick=()=>{ $('cfgBanner').innerHTML=''; };
+}
 function renderWatch(){
+  renderAcct();
   const flagged = flaggedSet();
   $('watch').innerHTML = PREFS.watch.length ? PREFS.watch.map(s=>tile(s,flagged)).join('') : '<div class="empty">✎ 내 화면 편집에서 관심종목을 골라 보세요.</div>';
 }
@@ -1272,6 +1326,9 @@ function drawModal(){
   const st=[['현재',fmtPrice(sym,m.last)+' '+meta.unit],['1일',fmtChg(sym,m.d1)],['1주',fmtChg(sym,m.d5)],['1개월',fmtChg(sym,m.m1)],['3개월',fmtChg(sym,m.m3)],['1년',fmtChg(sym,m.y1)],
     ['52주 고/저',fmtPrice(sym,m.hi)+' / '+fmtPrice(sym,m.lo)],['50일선 대비',meta.kind==='pct'?pct(m.vsMa50):fmtChg(sym,m.vsMa50)],['오늘 움직임 강도',(m.z1==null?'–':Math.abs(m.z1).toFixed(1)+'σ')],['연 변동성',meta.kind==='pct'?m.volAnn.toFixed(1)+'%':meta.kind==='yield'?Math.round(m.volAnn*100)+'bp':m.volAnn.toFixed(2)]];
   $('mStats').innerHTML = st.map(([a,b])=>`<div>${a}<b>${b}</b></div>`).join('');
+  $('mHold').innerHTML = holdForm(sym);
+  if($('hSave')) $('hSave').onclick=()=>{ const q=parseFloat($('hQ').value), p=parseFloat($('hP').value); PREFS.hold=PREFS.hold||{}; if(q>0){ PREFS.hold[sym]={q,p:p>0?p:0}; if(!PREFS.watch.includes(sym)) PREFS.watch.push(sym); } else delete PREFS.hold[sym]; applyPrefs(); drawModal(); };
+  if($('hDel')) $('hDel').onclick=()=>{ delete PREFS.hold[sym]; applyPrefs(); drawModal(); };
   const rel = INSIGHTS.filter(x=>x.syms.includes(sym));
   const nws = newsHtml(newsFor(sym), 5, '관련 뉴스');
   $('mIns').innerHTML = (nws?`<div style="margin-top:12px">${nws}</div>`:'') + (rel.length? `<h2>관련 인사이트</h2><div class="insights">${rel.map(insCard).join('')}</div>` : '');
@@ -1480,7 +1537,11 @@ try{ const tb0=location.hash==='#pick'?'pick':location.hash==='#cal'?'cal':local
 $('editBtn').onclick=()=>{ renderEdit(); $('edit').classList.add('open'); };
 $('sClose').onclick=()=>$('secm').classList.remove('open');
 $('eClose').onclick=()=>$('edit').classList.remove('open');
-$('eReset').onclick=()=>{ PREFS=JSON.parse(JSON.stringify(DEFAULT_PREFS)); applyPrefs(); };
+$('eShare').onclick=()=>{ const u=cfgLink(), b=$('eShare');
+  if(navigator.share){ navigator.share({title:'내 시장 모니터 설정',url:u}).catch(()=>{}); return; }
+  navigator.clipboard.writeText(u).then(()=>{ b.textContent='복사됨 ✓ 다른 기기에서 열어 주세요'; setTimeout(()=>b.textContent='다른 기기로 옮기기 (설정 링크 복사)',2500); }).catch(()=>{ b.textContent='복사 실패'; }); };
+checkCfgLink();
+$('eReset').onclick=()=>{ PREFS=Object.assign(JSON.parse(JSON.stringify(DEFAULT_PREFS)),{hold:PREFS.hold||{}}); applyPrefs(); };
 $('eMine').onchange=e=>{ PREFS.mine=e.target.checked; applyPrefs(); };
 document.addEventListener('change', e=>{ const c=e.target.closest('[data-sec]'); if(!c) return; const id=c.dataset.sec; PREFS.hidden = c.checked? PREFS.hidden.filter(x=>x!==id) : [...PREFS.hidden, id]; applyPrefs(); });
 $('mTable').onclick=()=>{showTable=!showTable; drawModal();};
