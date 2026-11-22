@@ -45,6 +45,8 @@ async function usEtf() {
   try { res.kr = await korea(); } catch (e) { console.log('한국 목록 실패:', e.message); if (prev) res.kr = prev.kr || []; }
   try { res.us = await usa(); } catch (e) { console.log('미국 목록 실패:', e.message); if (prev) res.us = prev.us || []; }
   try { const e = await usEtf(); const have = new Set(res.us.map(x => x[0])); for (const x of e) if (!have.has(x[0])) res.us.push(x); console.log('미국 ETF', e.length); } catch (e) { console.log('미국 ETF 실패:', e.message); }
+  const slim = x => [x[0], String(x[1] || '').slice(0, 40), x[2] == null ? null : +(+x[2]).toPrecision(6), x[3] == null ? null : Math.round(x[3] * 100) / 100];
+  res.kr = res.kr.map(slim); res.us = res.us.map(slim);
   console.log('종목 목록: 한국', res.kr.length, '/ 미국', res.us.length);
   fs.writeFileSync(out, JSON.stringify(res));
   console.log('크기', (fs.statSync(out).size / 1024).toFixed(0) + 'KB');
