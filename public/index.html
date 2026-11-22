@@ -179,14 +179,16 @@ button.sm{font-size:12.5px;padding:4px 10px;min-height:30px;font-weight:500}
 .rel summary::-webkit-details-marker{display:none}
 .relx{border-top:1px solid var(--border);padding:8px 0;font-size:12.5px;color:var(--text-secondary)}
 .relx b{color:var(--text-primary);display:block;margin-bottom:2px}
-.bpts{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:7px}
-.bpts li{display:grid;grid-template-columns:64px minmax(0,1fr);gap:8px;font-size:13.5px;line-height:1.5}
-.bpts .bk{font-size:12px;color:var(--text-muted);font-weight:600;padding-top:1px}
+.bpts{margin:12px 0 0;display:grid;gap:12px}
+.rp .rh{font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:3px}
+.rp p{margin:0;font-size:14px;line-height:1.65;color:var(--text-secondary)}
+.rp ul{margin:0;padding-left:18px;font-size:14px;line-height:1.6;color:var(--text-secondary)}
 .news{list-style:none;padding:0;margin:4px 0 0}
 .news li{padding:7px 0;border-top:1px solid var(--border);font-size:13.5px;line-height:1.45}
 .news li:first-child{border-top:0}
 .news a{color:var(--text-primary);text-decoration:none}
 .news a:hover{text-decoration:underline}
+.news em.en{font-style:normal;font-size:10.5px;padding:1px 5px;border-radius:4px;background:var(--surface-2);color:var(--accent);border:1px solid var(--border);margin-right:2px;vertical-align:1px}
 .news span{display:block;font-size:11.5px;color:var(--text-muted);margin-top:2px}
 .delta{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:13px;color:var(--text-secondary);line-height:1.6}
 .delta b{color:var(--text-primary)}
@@ -244,7 +246,7 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
     <div class="wl" id="briefDate">오늘의 브리핑</div>
     <div class="wh" id="worldH">…</div>
     <div class="ws" id="worldSub"></div>
-    <ul class="bpts" id="bpts"></ul>
+    <div class="bpts" id="bpts"></div>
     <div class="delta" id="delta"></div>
     <div id="bnews"></div>
   </div>
@@ -443,27 +445,38 @@ const SECTORS = [
    stocks:[['035420.KS','NAVER'],['035720.KS','카카오'],['MSFT','마이크로소프트'],['GOOGL','알파벳'],['META','메타']]},
 ];
 /*NEWS-TOPICS*/
-const NEWS_TOPICS = {
-  "HG=F":"구리 가격","ALI=F":"알루미늄 가격","CL=F":"국제유가","BZ=F":"브렌트유 유가","NG=F":"천연가스 가격","GC=F":"국제 금값","SI=F":"은 가격 은값",
+const NEWS_TOPICS_ALL = {"ko":{"HG=F":"구리 가격","ALI=F":"알루미늄 가격","CL=F":"국제유가","BZ=F":"브렌트유 유가","NG=F":"천연가스 가격","GC=F":"국제 금값","SI=F":"은 가격 은값",
   "ZW=F":"곡물 가격 밀 옥수수","KC=F":"커피 원두 가격","CC=F":"코코아 가격",
   "KRW=X":"원달러 환율","DX-Y.NYB":"달러 강세 달러인덱스","CNY=X":"위안화 환율","JPY=X":"엔화 환율","AUDUSD=X":"호주달러",
   "^TNX":"미국 국채 금리","2YY=F":"연준 금리 인하","^VIX":"뉴욕증시 변동성 공포","^GSPC":"뉴욕증시","^IXIC":"나스닥 기술주","^KS11":"코스피",
   "000001.SS":"중국 경제 지표","^HSI":"홍콩 증시 항셍","^N225":"일본 증시 닛케이","BTC-USD":"비트코인",
   "sec:semi":"반도체 업황","sec:power":"전력기기 변압기 수주","sec:battery":"2차전지 배터리","sec:steel":"철강 업황","sec:energy":"정유사 정제마진",
   "sec:ship":"조선 수주","sec:defense":"방산 수출","sec:auto":"자동차 수출 관세","sec:fin":"은행 금융지주 실적","sec:bio":"바이오 제약 신약","sec:internet":"네이버 카카오 AI"
+  },
+  "en":{
+    "HG=F":"copper prices","ALI=F":"aluminum prices","CL=F":"oil prices","BZ=F":"Brent crude","NG=F":"natural gas prices","GC=F":"gold price","SI=F":"silver price",
+    "ZW=F":"wheat corn prices","KC=F":"coffee prices","CC=F":"cocoa prices",
+    "KRW=X":"Korean won","DX-Y.NYB":"US dollar index","CNY=X":"Chinese yuan","JPY=X":"Japanese yen","AUDUSD=X":"Australian dollar",
+    "^TNX":"Treasury yields","2YY=F":"Fed rate cut","^VIX":"Wall Street volatility VIX","^GSPC":"stock market today","^IXIC":"Nasdaq tech stocks","^KS11":"KOSPI South Korea stocks",
+    "000001.SS":"China economy","^HSI":"Hang Seng","^N225":"Nikkei Japan stocks","BTC-USD":"bitcoin",
+    "sec:semi":"semiconductor stocks","sec:power":"power grid transformer demand","sec:battery":"EV battery lithium","sec:steel":"steel prices China","sec:energy":"oil refining margins",
+    "sec:ship":"shipbuilding orders LNG carrier","sec:defense":"defense stocks spending","sec:auto":"auto tariffs automakers","sec:fin":"bank earnings interest margin","sec:bio":"biotech pharma stocks","sec:internet":"AI software stocks"
+  }
 };
 /*END-NEWS-TOPICS*/
+const NEWS_TOPICS = NEWS_TOPICS_ALL.ko;
 const NEWS_ALIAS = {CUGOLD:'HG=F',GSR:'GC=F',CURVE:'^TNX',CURVE2:'2YY=F',BW:'CL=F',CRACK:'sec:energy',KRWJPY:'JPY=X',KRWEUR:'KRW=X',KRWCNY:'CNY=X',
   'RB=F':'CL=F','HO=F':'CL=F','ZC=F':'ZW=F','ZS=F':'ZW=F','SB=F':'ZW=F','LE=F':'ZW=F','PL=F':'sec:auto','PA=F':'sec:auto','^FVX':'^TNX','^TYX':'^TNX','^IRX':'2YY=F',
   '^STOXX50E':'^GSPC','EURUSD=X':'DX-Y.NYB'};
 let NEWS = {fetchedAt:0, topics:{}};
 const newsKey = s => STOCK_SECTOR[s] ? 'sec:'+STOCK_SECTOR[s] : (NEWS_TOPICS[s] ? s : NEWS_ALIAS[s]);
-const newsFor = s => (NEWS.topics[newsKey(s)]||[]);
+const mixNews = k => { const ko=NEWS.topics[k]||[], en=(NEWS.topics['en:'+k]||[]).map(x=>Object.assign({en:true},x)); const out=[]; for(let i=0;i<Math.max(ko.length,en.length);i++){ if(ko[i]) out.push(ko[i]); if(en[i]) out.push(en[i]); } return out; };
+const newsFor = s => { const k=newsKey(s); return k? mixNews(k) : []; };
 const ago = t => { if(!t) return ''; const m=Math.round((Date.now()-t)/60000); return m<60? m+'분 전' : m<1440? Math.round(m/60)+'시간 전' : Math.round(m/1440)+'일 전'; };
 const esc = x => String(x).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function newsHtml(list, n, label='관련 뉴스'){
   if(!list || !list.length) return '';
-  return `<div class="sec">${label}</div><ul class="news">${list.slice(0,n).map(x=>`<li><a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a><span>${esc(x.source||'')}${x.time?' · '+ago(x.time):''}</span></li>`).join('')}</ul>`;
+  return `<div class="sec">${label}</div><ul class="news">${list.slice(0,n).map(x=>`<li>${x.en?'<em class="en">해외</em> ':''}<a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a><span>${esc(x.source||'')}${x.time?' · '+ago(x.time):''}</span></li>`).join('')}</ul>`;
 }
 async function loadNews(){
   try{ const r=await fetch('news.json?t='+Date.now(),{cache:'no-store'}); if(r.ok){ const j=await r.json(); if(j&&j.topics) NEWS=j; } }catch(_){}
@@ -959,7 +972,7 @@ function drawSector(){
   const why = [tails.length?`순풍: ${tails.map(desc).join(', ')}`:'', heads.length?`역풍: ${heads.map(desc).join(', ')}`:''].filter(Boolean).join(' / ');
   $('sMacro').innerHTML = `<div class="macro">${verdict} ${why?why+'.':''}<br><span class="note">대표 종목 평균: 1일 ${pct(st.d1)} · 1주 ${pct(st.d5)} · 1개월 ${pct(st.m1)}</span>
     <div style="margin-top:8px">${st.drv.map(d=>`<div class="drv" data-sym="${d.s}"><span>${d.label} <span class="note">(${d.sign>0?'오르면 좋음':'내리면 좋음'})</span></span><span class="${dirCls(d.m.m1)}">1개월 ${fmtChg(d.s,d.m.m1)} · <b>${d.eff>=0.5?'순풍':d.eff<=-0.5?'역풍':'중립'}</b></span></div>`).join('')}</div></div>`;
-  $('sNews').innerHTML = newsHtml(NEWS.topics['sec:'+sec.id], 6, sec.name+' 뉴스');
+  $('sNews').innerHTML = newsHtml(mixNews('sec:'+sec.id), 8, sec.name+' 뉴스 (국내·해외)');
   $('sList').innerHTML = sec.stocks.map(([s])=>{
     const m=METRICS[s], meta=META[s], on=PREFS.watch.includes(s);
     if(!m) return `<div class="srow"><div class="nm2">${meta.name}<small>${meta.why}</small></div><div></div><div class="pr note">데이터 없음</div><div></div></div>`;
@@ -1084,25 +1097,41 @@ function renderBrief(W){
   const ref = DATA['^GSPC']||DATA['^KS11'];
   if(ref&&ref.t&&ref.t.length){ const d=new Date(ref.t[ref.t.length-1]*1000);
     $('briefDate').textContent = `오늘의 브리핑 · ${new Date().toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'short'})} · 미국장 ${d.toLocaleDateString('ko-KR',{month:'numeric',day:'numeric',weekday:'short'})} 마감 기준`; }
-  const b=[];
-  const chg=s=>g(s)?`${nm(s)} <b class="${dirCls(g(s).d1)}">${fmtChg(s,g(s).d1)}</b>`:'';
-  b.push(['증시', ['^GSPC','^IXIC','^KS11','000001.SS'].map(chg).filter(Boolean).join(' · ')]);
-  const comm = ['HG=F','CL=F','GC=F','SI=F','NG=F','ALI=F','ZW=F','ZC=F','ZS=F','KC=F','CC=F','PL=F','PA=F'].filter(s=>g(s)&&g(s).z1!=null).sort((a,b)=>Math.abs(g(b).z1)-Math.abs(g(a).z1)).slice(0,3);
-  b.push(['원자재', comm.map(s=>chg(s)+(Math.abs(g(s).z1)>=1.5?` <span class="note">(평소의 ${Math.abs(g(s).z1).toFixed(1)}배)</span>`:'')).join(' · ')]);
-  const fx=[]; if(g('^TNX')) fx.push(`미 10년물 ${g('^TNX').last.toFixed(2)}% <b class="${dirCls(g('^TNX').d1)}">${bp(g('^TNX').d1)}</b>`);
-  if(g('KRW=X')) fx.push(`원/달러 ${num(g('KRW=X').last,1)}원 <b class="${dirCls(g('KRW=X').d1)}">${fmtChg('KRW=X',g('KRW=X').d1)}</b>`);
-  if(g('DX-Y.NYB')) fx.push(chg('DX-Y.NYB'));
-  b.push(['금리·환율', fx.join(' · ')]);
-  if(W.top){ const first=W.top.meaning.split(/(?<=[.다])\s/)[0]; b.push(['핵심 신호', `<a href="#s-top" class="lk">${W.top.title}</a><br><span class="note">${first}</span>`]); }
+  // ---- 보고서 형식: 1) 무슨 일이 2) 왜 중요한가 3) 우리에게 영향 4) 앞으로 볼 것 ----
+  const P = (s)=>g(s)?`<b class="${dirCls(g(s).d1)}">${fmtChg(s,g(s).d1)}</b>`:'';
+  const verb = x => x==null?'':x>0.05?'올랐습니다':x<-0.05?'내렸습니다':'보합이었습니다';
+  const S1=[];
+  if(g('^GSPC')&&g('^IXIC')){ const a=g('^GSPC').d1, c=g('^IXIC').d1;
+    S1.push(`미국 증시는 S&P 500 ${P('^GSPC')}, 나스닥 ${P('^IXIC')}로 ${a*c<0?'엇갈렸습니다':(a>0?'함께 올랐습니다':'함께 내렸습니다')}.`); }
+  if(g('^KS11')) S1.push(`코스피는 ${P('^KS11')} ${verb(g('^KS11').d1)}${g('000001.SS')?`(상하이 ${P('000001.SS')})`:''}.`);
+  const comm = ['HG=F','CL=F','GC=F','SI=F','NG=F','ALI=F','ZW=F','ZC=F','ZS=F','KC=F','CC=F','PL=F','PA=F'].filter(s=>g(s)&&g(s).z1!=null).sort((a,b)=>Math.abs(g(b).z1)-Math.abs(g(a).z1));
+  if(comm.length){ const c0=comm[0], big=Math.abs(g(c0).z1)>=1.5;
+    S1.push(`원자재에서는 ${nm(c0)}가 ${P(c0)}${big?`로 평소보다 ${Math.abs(g(c0).z1).toFixed(1)}배 크게 움직였고`:' 움직였고'}, ${comm.slice(1,3).map(s=>`${nm(s)} ${P(s)}`).join(', ')}도 함께 움직였습니다.`); }
+  if(g('^TNX')||g('KRW=X')){ const t=g('^TNX'), k=g('KRW=X'); const parts=[];
+    if(t) parts.push(`미 10년물 금리는 ${t.last.toFixed(2)}%로 ${Math.abs(Math.round(t.d1*100))}bp ${t.d1>0?'올랐고':t.d1<0?'내렸고':'그대로였고'}`);
+    if(k) parts.push(`원/달러 환율은 ${num(k.last,1)}원(${P('KRW=X')})으로 원화가 ${k.d1>0?'약해졌습니다':k.d1<0?'강해졌습니다':'제자리였습니다'}`);
+    S1.push(parts.join(', ')+'.'); }
+  const S2=[];
+  if(W.top){ const sent=W.top.meaning.split(/(?<=[.다])\s/).slice(0,2).join(' '); S2.push(`가장 눈에 띄는 신호는 <a href="#s-top" class="lk">${W.top.title.replace('복합 신호: ','')}</a>입니다. ${sent}`); }
+  const S3=[];
+  const k=g('KRW=X'), oil=g('CL=F');
+  if(k&&Math.abs(k.d5)>=0.7) S3.push(k.d5>0?`원화가 1주일간 ${Math.abs(k.d5).toFixed(1)}% 약해졌습니다. 수출기업(반도체·자동차·조선) 실적에는 도움이 되지만, 수입물가와 해외여행 비용은 오릅니다.`:`원화가 1주일간 ${Math.abs(k.d5).toFixed(1)}% 강해졌습니다. 수입물가 부담은 줄지만 수출기업 가격 경쟁력에는 불리합니다.`);
+  if(oil&&Math.abs(oil.d5)>=4) S3.push(oil.d5>0?`유가가 1주일간 ${Math.abs(oil.d5).toFixed(1)}% 올랐습니다. 원유를 전량 수입하는 한국에는 무역수지·물가 부담이고, 정유주에는 우호적입니다.`:`유가가 1주일간 ${Math.abs(oil.d5).toFixed(1)}% 내렸습니다. 한국의 물가·무역수지에는 도움이 되지만, 수요 둔화 신호일 수 있습니다.`);
   const secs = SECTORS.map(sec=>({sec, st:sectorStats(sec)})).filter(x=>x.st.d1!=null).sort((a,b)=>b.st.d1-a.st.d1);
-  if(secs.length>=4){ const f=x=>`<span data-sec-open="${x.sec.id}" style="cursor:pointer">${x.sec.name} <b class="${dirCls(x.st.d1)}">${pct(x.st.d1)}</b></span>`;
-    b.push(['섹터', `강세 ${secs.slice(0,2).map(f).join(', ')} / 약세 ${secs.slice(-2).reverse().map(f).join(', ')}`]); }
-  if(W.top&&W.top.check&&W.top.check.length) b.push(['체크', W.top.check.slice(0,2).join(', ')]);
-  $('bpts').innerHTML = b.filter(x=>x[1]).map(([k,v])=>`<li><span class="bk">${k}</span><span>${v}</span></li>`).join('');
+  if(secs.length>=4){ const f=x=>`<span data-sec-open="${x.sec.id}" class="lk" style="cursor:pointer">${x.sec.name}</span>(${pct(x.st.d1)})`;
+    S3.push(`섹터별로는 ${secs.slice(0,2).map(f).join(', ')}가 강했고, ${secs.slice(-2).reverse().map(f).join(', ')}가 약했습니다.`);
+    const head=secs.map(x=>x).filter(x=>x.st.wind==='head').map(x=>x.sec.name), tail=secs.filter(x=>x.st.wind==='tail').map(x=>x.sec.name);
+    if(tail.length||head.length) S3.push(`거시 환경으로 보면 ${[tail.length?`순풍을 받는 섹터는 <b>${tail.slice(0,3).join(', ')}</b>`:'', head.length?`역풍을 받는 섹터는 <b>${head.slice(0,3).join(', ')}</b>`:''].filter(Boolean).join(', ')}입니다.`); }
+  const S4=[];
+  if(W.top&&W.top.check&&W.top.check.length) S4.push(...W.top.check.slice(0,3));
+  if(g('^VIX')&&g('^VIX').last>=20) S4.push(`VIX가 ${num(g('^VIX').last,1)}로 높습니다. 변동성이 커질 수 있으니 무리한 판단은 피하세요.`);
+  if(!S4.length) S4.push('특별히 경계할 신호는 없습니다. 평소처럼 큰 흐름만 확인하시면 됩니다.');
+  const sec=(n,t,arr,list)=>arr.length?`<div class="rp"><div class="rh">${n}. ${t}</div>${list?`<ul>${arr.map(x=>`<li>${x}</li>`).join('')}</ul>`:`<p>${arr.join(' ')}</p>`}</div>`:'';
+  $('bpts').innerHTML = sec(1,'무슨 일이 있었나',S1) + sec(2,'왜 중요한가',S2) + sec(3,'우리에게 미치는 영향',S3) + sec(4,'앞으로 확인할 것',S4,true);
   // 브리핑 뉴스: 핵심 신호 관련 2건 + 코스피·뉴욕증시 1건씩 (중복 제거)
   const pool=[]; const seen=new Set(); const push=(arr,n)=>{ let c=0; for(const x of (arr||[])){ if(c>=n) break; if(seen.has(x.link)) continue; seen.add(x.link); pool.push(x); c++; } };
-  if(W.top) push(newsFor(W.top.syms[0]),2); push(NEWS.topics['^KS11'],1); push(NEWS.topics['^GSPC'],1); push(NEWS.topics['KRW=X'],1);
-  $('bnews').innerHTML = pool.length? `<div style="margin-top:10px">${newsHtml(pool,5,'오늘 읽을 뉴스')}</div>` : (MODE==='demo'?'<div class="note" style="margin-top:8px">실제 배포 화면에서는 여기에 관련 뉴스가 붙습니다.</div>':'');
+  if(W.top) push(newsFor(W.top.syms[0]),3); push(NEWS.topics['^KS11'],1); push((NEWS.topics['en:^GSPC']||[]).map(x=>({...x,en:true})),1); push(NEWS.topics['KRW=X'],1); push((NEWS.topics['en:^TNX']||[]).map(x=>({...x,en:true})),1);
+  $('bnews').innerHTML = pool.length? `<div style="margin-top:10px">${newsHtml(pool.map(x=>x),6,'오늘 읽을 뉴스 (국내·해외)')}</div>` : (MODE==='demo'?'<div class="note" style="margin-top:8px">실제 배포 화면에서는 여기에 관련 뉴스가 붙습니다.</div>':'');
 }
 function renderDelta(RG){
   if(!PREV){ $('delta').innerHTML=''; return; }

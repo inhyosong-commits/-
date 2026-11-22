@@ -11,8 +11,9 @@ const decode = s => s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
   .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'").replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').trim();
 const tag = (x, t) => { const m = x.match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)</${t}>`)); return m ? decode(m[1]) : ''; };
 
-async function fetchTopic(q) {
-  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(q + ' when:3d')}&hl=ko&gl=KR&ceid=KR:ko`;
+const LOCALE = { ko: 'hl=ko&gl=KR&ceid=KR:ko', en: 'hl=en-US&gl=US&ceid=US:en' };
+async function fetchTopic(q, lang = 'ko') {
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(q + ' when:3d')}&${LOCALE[lang]}`;
   const res = await fetch(url, { headers: { 'User-Agent': UA } });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const xml = await res.text();
@@ -34,7 +35,11 @@ async function fetchTopic(q) {
   const prevUrl = process.argv[3];
   const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
   const a = html.indexOf('/*NEWS-TOPICS*/') + '/*NEWS-TOPICS*/'.length, b = html.indexOf('/*END-NEWS-TOPICS*/');
-  const topics = JSON.parse(html.slice(a, b).trim().replace(/^const NEWS_TOPICS\s*=\s*/, '').replace(/;\s*$/, ''));
+  const all = JSON.parse(html.slice(a, b).trim().replace(/^const NEWS_TOPICS_ALL\s*=\s*/, '').replace(/;\s*$/, ''));
+  // 국내(ko)는 키 그대로, 해외(en)는 'en:키' 로 저장
+  const topics = {};
+  for (const [k, q] of Object.entries(all.ko || {})) topics[k] = [q, 'ko'];
+  for (const [k, q] of Object.entries(all.en || {})) topics['en:' + k] = [q, 'en'];
 
   let prev = null;
   if (prevUrl) { try { prev = await (await fetch(prevUrl, { cache: 'no-store' })).json(); } catch (e) { console.log('이전 뉴스 없음'); } }
@@ -44,8 +49,8 @@ async function fetchTopic(q) {
     return;
   }
   const result = { fetchedAt: Date.now(), topics: {} }, errors = {};
-  for (const [key, q] of Object.entries(topics)) {
-    try { result.topics[key] = await fetchTopic(q); }
+  for (const [key, [q, lang]] of Object.entries(topics)) {
+    try { result.topics[key] = await fetchTopic(q, lang); }
     catch (e) { errors[key] = e.message; if (prev && prev.topics && prev.topics[key]) result.topics[key] = prev.topics[key]; }
     await sleep(400);
   }
