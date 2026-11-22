@@ -147,6 +147,19 @@ button.sm{font-size:12.5px;padding:4px 10px;min-height:30px;font-weight:500}
 .tog{display:inline-block;margin:0 6px 6px 0;padding:7px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface-2);font-size:13px;cursor:pointer;color:var(--text-secondary)}
 .tog.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .tog.on::before{content:"✓ "}
+.grp{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;padding:0 12px}
+.grp summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 0;min-height:48px}
+.grp summary::-webkit-details-marker{display:none}
+.grp .gt{font-weight:700;font-size:14.5px;white-space:nowrap}
+.grp .gm{flex:1;font-size:12px;color:var(--text-secondary)}
+.grp .gx{font-size:12px;color:var(--text-muted);white-space:nowrap}
+.grp[open]{padding-bottom:12px}
+.rel summary{cursor:pointer;color:var(--accent);font-size:12.5px;list-style:none;padding:4px 0}
+.rel summary::-webkit-details-marker{display:none}
+.relx{border-top:1px solid var(--border);padding:8px 0;font-size:12.5px;color:var(--text-secondary)}
+.relx b{color:var(--text-primary);display:block;margin-bottom:2px}
+.delta{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:13px;color:var(--text-secondary);line-height:1.6}
+.delta b{color:var(--text-primary)}
 .empty{color:var(--text-muted);font-size:13px;padding:10px;border:1px dashed var(--border);border-radius:10px}
 footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(safe-area-inset-bottom));text-align:center;line-height:1.7}
 .hide-sm{}
@@ -159,6 +172,9 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
   .regime{grid-template-columns:1fr 1fr;gap:8px}
   .rtile{padding:10px 12px}
   .world .wh{font-size:21px}
+  .parts{display:none}
+  .rtile{padding:9px 11px}
+  .rline{margin-top:6px}
   .rline{font-size:12.5px}
   .insights{grid-template-columns:1fr}
   .grid{grid-template-columns:1fr 1fr;gap:6px}
@@ -166,6 +182,13 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
   .q .px{font-size:17px}
   .q .chg{font-size:11.5px;gap:6px;flex-wrap:wrap}
   .q .chg .mo{display:none}
+  .q .pos52{display:none}
+  .q .why1{-webkit-line-clamp:1;min-height:0}
+  details.grp summary{flex-wrap:wrap;row-gap:2px}
+  details.grp .gm{order:3;flex-basis:100%}
+  details.grp .gx{margin-left:auto}
+  .hrow{flex-wrap:nowrap}
+  header h1{font-size:15px;white-space:nowrap}
   .modal{padding:0;align-items:stretch}
   .panel{border-radius:0;max-height:none;height:100%;width:100%;padding:calc(12px + env(safe-area-inset-top)) 14px calc(20px + env(safe-area-inset-bottom))}
   .chartwrap svg{height:240px}
@@ -191,6 +214,7 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
     <div class="wl">오늘의 세계 <span class="note">최근 1개월 흐름 기준</span></div>
     <div class="wh" id="worldH">…</div>
     <div class="ws" id="worldSub"></div>
+    <div class="delta" id="delta"></div>
   </div>
   <div class="regime" id="regime"></div>
   <details class="guide"><summary>조합해서 읽는 법 ▾</summary>
@@ -223,7 +247,8 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
 
 
 
-  <div id="groups"></div>
+  <section id="s-all"><h2>전체 지표 <small>눌러서 펼치기 · 오른쪽은 오늘 가장 크게 움직인 것</small></h2>
+  <div id="groups"></div></section>
 </main>
 
 <div class="modal" id="modal">
@@ -435,6 +460,10 @@ const bp = x=> x==null?'–':(x>0?'+':'')+Math.round(x*100)+'bp';
 const num = (x,d)=> x==null?'–':x.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
 const nm = s=>META[s]?META[s].name:s;
 
+const TOPIC_BY_SYM = {'HG=F':'china','CUGOLD':'growth','CL=F':'energy','BZ=F':'energy','BW':'energy','NG=F':'energy',
+  'GC=F':'fear','^VIX':'fear','^GSPC':'fear','GSR':'metals','SI=F':'metals','PA=F':'metals','PL=F':'metals',
+  'DX-Y.NYB':'dollar','KRW=X':'dollar','CURVE':'rates','CURVE2':'rates','^TNX':'rates',
+  'ZW=F':'food','ZC=F':'food','ZS=F':'food','KC=F':'food','CC=F':'food','SB=F':'food'};
 function buildInsights(M){
   const out=[]; const g=s=>M[s]||{}; const has=(...s)=>s.every(x=>M[x]);
   const add=o=>out.push(Object.assign({alt:[],check:[],ev:[],syms:[],conf:1},o));
@@ -610,7 +639,7 @@ function buildInsights(M){
     meaning:'중국과 연결된 자산 5개 중 '+china+'개가 같은 방향(약세)을 가리킵니다. 하나만 움직일 때보다 "중국 수요 둔화" 해석의 신뢰도가 높아집니다. 한국은 대중국 수출 비중이 커서 코스피·원화에도 부담 요인입니다.',
     check:['중국 PMI·수출입 통계','인민은행 정책(지준율·금리)','중국 부동산 개발사 뉴스']});
   const rec=[g('HG=F').d5<=-3, g('CL=F').d5<=-3, g('^TNX').d5<=-0.08, g('GC=F').d5>0].filter(Boolean).length;
-  if(rec>=4) add({level:'strong', syms:['HG=F','CL=F','^TNX','GC=F'], title:'복합 신호: 경기침체 우려', conf:3,
+  if(rec>=4) add({topic:'growth', level:'strong', syms:['HG=F','CL=F','^TNX','GC=F'], title:'복합 신호: 경기침체 우려', conf:3,
     ev:[`구리 ${pct(g('HG=F').d5)} · 유가 ${pct(g('CL=F').d5)} · 10년물 ${bp(g('^TNX').d5)} · 금 ${pct(g('GC=F').d5)} (1주)`],
     meaning:'산업 수요(구리)와 에너지 수요(유가)가 함께 꺾이고, 돈이 국채(금리↓)와 금으로 피신하고 있습니다. 시장이 "경기가 나빠진다"에 베팅할 때 나오는 전형적인 조합입니다.',
     check:['미국 고용지표(실업수당 청구)','ISM 제조업 지수','연준 금리 인하 기대 변화']});
@@ -619,11 +648,11 @@ function buildInsights(M){
     ev:[`S&P ${pct(g('^GSPC').d5)} · VIX ${pct(g('^VIX').d5,0)} · 금 ${pct(g('GC=F').d5)} · 10년물 ${bp(g('^TNX').d5)} · 엔/달러 ${pct(g('JPY=X').d5)} (1주)`],
     meaning:'주식↓, 변동성↑, 금↑, 국채금리↓(채권 매수), 엔화 강세가 동시에 나타나는 전형적인 안전자산 선호 패턴입니다.'});
   const stag=[g('CL=F').m1>=10, g('^TNX').m1>=0.25, g('^GSPC').m1<0, g('HG=F').m1<0].filter(Boolean).length;
-  if(stag>=3) add({level:'notable', syms:['CL=F','^TNX','^GSPC','HG=F'], title:'복합 신호: 스태그플레이션 우려', conf:2,
+  if(stag>=3) add({topic:'growth', level:'notable', syms:['CL=F','^TNX','^GSPC','HG=F'], title:'복합 신호: 스태그플레이션 우려', conf:2,
     ev:[`유가 1개월 ${pct(g('CL=F').m1)} · 10년물 ${bp(g('^TNX').m1)} · S&P ${pct(g('^GSPC').m1)} · 구리 ${pct(g('HG=F').m1)}`],
     meaning:'에너지 가격과 금리는 오르는데 주식과 산업금속은 약합니다. "물가는 오르는데 성장은 식는" 조합으로, 중앙은행이 대응하기 가장 어려운 환경입니다.'});
   const refl=[g('HG=F').m1>3, g('CL=F').m1>3, g('^TNX').m1>0.1, g('^GSPC').m1>2, g('AUDUSD=X').m1>0].filter(Boolean).length;
-  if(refl>=5) add({level:'watch', syms:['HG=F','CL=F','^TNX','^GSPC'], title:'복합 신호: 리플레이션(경기 회복 베팅)', conf:2,
+  if(refl>=5) add({topic:'growth', level:'watch', syms:['HG=F','CL=F','^TNX','^GSPC'], title:'복합 신호: 리플레이션(경기 회복 베팅)', conf:2,
     ev:[`구리 ${pct(g('HG=F').m1)} · 유가 ${pct(g('CL=F').m1)} · 10년물 ${bp(g('^TNX').m1)} · S&P ${pct(g('^GSPC').m1)} (1개월)`],
     meaning:'원자재·금리·주식이 함께 오르는, 시장이 성장 가속을 가격에 반영하는 국면입니다. 경기민감주·신흥국·원자재 수출국에 유리한 경향이 있습니다.'});
   const comms=['HG=F','GC=F','SI=F','CL=F','BZ=F','NG=F','ZW=F','ZC=F','ZS=F','ALI=F'].filter(s=>M[s]);
@@ -634,7 +663,14 @@ function buildInsights(M){
 
   const order={strong:0,notable:1,watch:2,info:3};
   out.sort((a,b)=>order[a.level]-order[b.level]||b.conf-a.conf);
-  return out;
+  // 같은 원인(주제)의 신호는 가장 강한 카드 하나로 묶기
+  const groups={}, merged=[];
+  for(const x of out){
+    x.topic = x.topic || TOPIC_BY_SYM[x.syms[0]] || x.syms[0];
+    if(groups[x.topic]){ groups[x.topic].related.push(x); continue; }
+    x.related=[]; groups[x.topic]=x; merged.push(x);
+  }
+  return merged;
 }
 
 /* 레짐 점수 */
@@ -712,6 +748,7 @@ function spark(c){
 function renderRegime(){
   const RG = regime(METRICS), W = worldHeadline(RG, INSIGHTS);
   $('worldH').textContent = W.h;
+  renderDelta(RG);
   $('worldSub').innerHTML = W.sub + (W.top?`<br><span class="note">가장 강한 신호: <a href="#s-top" class="lk">${W.top.title}</a></span>`:'');
   $('regime').innerHTML = RG.map(r=>{
     if(r.v==null) return `<div class="rtile"><div class="lbl">${r.k}</div><div class="val">–</div></div>`;
@@ -737,6 +774,7 @@ function insCard(x){
     ${x.support&&x.support.length?`<div class="sec">뒷받침하는 신호</div>${li(x.support)}`:''}
     ${x.alt&&x.alt.length?`<div class="sec">다른 해석 가능성</div>${li(x.alt)}`:''}
     ${x.check&&x.check.length?`<div class="sec">확인할 것</div>${li(x.check)}`:''}</details>`:''}
+    ${x.related&&x.related.length?`<details class="rel"><summary>같은 맥락의 신호 ${x.related.length}개 ▾</summary>${x.related.map(r=>`<div class="relx"><b>${r.title}</b><div>${r.meaning}</div>${li(r.ev)}</div>`).join('')}</details>`:''}
     <div class="chips">${x.syms.filter(s=>METRICS[s]).map(s=>`<span class="chip" data-sym="${s}">${nm(s)} ${fmtChg(s,METRICS[s].d5)}</span>`).join('')}</div>
   </div>`;
 }
@@ -746,7 +784,7 @@ function renderInsights(){
   $('insFilters').innerHTML = fs.map(([k,l])=>`<button data-f="${k}" class="${insFilter===k?'on':''}">${l} ${cnt(k)}</button>`).join('');
   const mine = x=>!PREFS.mine || x.syms.some(s=>PREFS.watch.includes(s));
   const list = INSIGHTS.filter(mine).filter(x=>insFilter==='all'||(insFilter==='alert'?x.level!=='info':x.level===insFilter));
-  const LIM = 4, more = list.length - LIM;
+  const LIM = 3, more = list.length - LIM;
   $('insights').innerHTML = list.length? list.slice(0, insAll?list.length:LIM).map(insCard).join('') + (more>0?`<button id="insMore" class="sm" style="justify-self:start">${insAll?'접기 ▴':`신호 ${more}개 더 보기 ▾`}</button>`:'') : `<div class="note">${PREFS.mine?'내 관심종목과 관련된 ':''}눈에 띄는 급변 신호가 없습니다.${PREFS.mine?' (편집에서 "관련 신호만 보기"를 끄면 전체 신호가 보입니다)':' 시장이 평소 범위 안에서 움직이는 중입니다.'}</div>`;
 }
 
@@ -776,15 +814,20 @@ function renderWatch(){
   $('watch').innerHTML = PREFS.watch.length ? PREFS.watch.map(s=>tile(s,flagged)).join('') : '<div class="empty">✎ 내 화면 편집에서 관심종목을 골라 보세요.</div>';
 }
 function flaggedSet(){ return new Set(INSIGHTS.filter(x=>x.level!=='info').flatMap(x=>x.syms.slice(0,1))); }
+let OPEN = new Set(); try{ OPEN = new Set(JSON.parse(localStorage.getItem('cmOpen')||'[]')); }catch(_){}
+document.addEventListener('toggle', e=>{ const d=e.target; if(!d.dataset||!d.dataset.g) return; d.open?OPEN.add(d.dataset.g):OPEN.delete(d.dataset.g); try{localStorage.setItem('cmOpen',JSON.stringify([...OPEN]));}catch(_){} }, true);
 function renderGroups(){
   const flagged = flaggedSet();
   $('groups').innerHTML = GROUPS.map(([g,label,desc])=>{
     const syms = Object.values(META).filter(m=>m.group===g).map(m=>m.sym);
-    return `<section id="g-${g}"><h2>${label} <small>${desc}</small></h2><div class="grid">${syms.map(s=>tile(s,flagged)).join('')}</div></section>`;
+    const movers = syms.filter(s=>METRICS[s]&&METRICS[s].z1!=null).sort((a,b)=>Math.abs(METRICS[b].z1)-Math.abs(METRICS[a].z1)).slice(0,3);
+    const open = OPEN.has(g);
+    return `<section id="g-${g}"><details class="grp" data-g="${g}" ${open?'open':''}><summary><span class="gt">${label}</span><span class="gm">${movers.map(s=>`${nm(s)} <b class="${dirCls(METRICS[s].d1)}">${fmtChg(s,METRICS[s].d1)}</b>`).join(' · ')}</span><span class="gx">${syms.length}개 ▾</span></summary>
+      <div class="note" style="margin:2px 0 8px">${desc}</div><div class="grid">${syms.map(s=>tile(s,flagged)).join('')}</div></details></section>`;
   }).join('');
   const alerts = INSIGHTS.filter(x=>x.level!=='info').length;
   const short = {growth:'경기',infl:'인플레',money:'금리·달러',mood:'심리',stocks:'주가',softs:'농산물'};
-  $('secnav').innerHTML = `<a href="#s-world">요약</a><a href="#s-top">신호${alerts?`<b>${alerts}</b>`:''}</a><a href="#s-watch">내 종목</a>` + GROUPS.filter(([g])=>!isHidden('g-'+g)).map(([g])=>`<a href="#g-${g}">${short[g]}</a>`).join('');
+  $('secnav').innerHTML = `<a href="#s-world">요약</a><a href="#s-top">신호${alerts?`<b>${alerts}</b>`:''}</a><a href="#s-watch">내 종목</a><a href="#s-all">전체 지표</a>`;
 }
 function tile(s, flagged){
       const m=METRICS[s], meta=META[s];
@@ -861,6 +904,31 @@ function updateAge(){
   $('updated').textContent = MODE==='demo' ? '데모 화면입니다. 숫자는 예시예요.' :
     `데이터 기준 ${t} (${mins<1?'방금':mins<60?mins+'분 전':Math.floor(mins/60)+'시간 '+(mins%60)+'분 전'}) · 시세 자체는 10~20분 지연 가능`;
 }
+// 하루 전 상태 (각 시계열의 마지막 1개를 빼고 다시 계산)
+let PREV=null;
+function computePrev(items){
+  const D={};
+  for(const [s,v] of Object.entries(items)){ if(META[s]&&!META[s].derived&&v&&v.c&&v.c.length>31) D[s]={t:v.t.slice(0,-1), c:v.c.slice(0,-1)}; }
+  computeDerived(D);
+  const M={}; for(const s of Object.keys(META)){ const m=metrics(s,D[s]); if(m) M[s]=m; }
+  return { M, ins: buildInsights(M), rg: regime(M) };
+}
+function renderDelta(RG){
+  if(!PREV){ $('delta').innerHTML=''; return; }
+  const parts=[];
+  const K=t=>t.replace(/[-+]?[\d.,]+/g,'#'); const prevT=new Set(PREV.ins.flatMap(x=>[x,...(x.related||[])]).filter(x=>x.level!=='info').map(x=>K(x.title)));
+  const nowAll=INSIGHTS.flatMap(x=>[x,...(x.related||[])]).filter(x=>x.level!=='info');
+  const fresh=nowAll.filter(x=>!prevT.has(K(x.title))).slice(0,2);
+  const curT=new Set(nowAll.map(x=>K(x.title)));
+  const gone=PREV.ins.flatMap(x=>[x,...(x.related||[])]).filter(x=>x.level!=='info'&&!curT.has(K(x.title))).slice(0,1);
+  if(fresh.length) parts.push(`새 신호: <b>${fresh.map(x=>x.title.split(' → ')[0].replace('복합 신호: ','')).join(', ')}</b>`);
+  if(gone.length) parts.push(`사라진 신호: ${gone.map(x=>x.title.split(' → ')[0].replace('복합 신호: ','')).join(', ')}`);
+  const mv=RG.map((r,i)=>({k:r.k,d:(r.v??0)-(PREV.rg[i].v??0)})).filter(x=>Math.abs(x.d)>=8);
+  if(mv.length) parts.push('렌즈 변화: '+mv.map(x=>`${x.k} <b class="${dirCls(x.d)}">${x.d>0?'+':''}${x.d}</b>`).join(', '));
+  const big=Object.values(METRICS).filter(m=>m.z1!=null&&!META[m.sym].derived).sort((a,b)=>Math.abs(b.z1)-Math.abs(a.z1)).slice(0,3);
+  parts.push('가장 크게 움직인 것: '+big.map(m=>`<span data-sym="${m.sym}" style="cursor:pointer">${nm(m.sym)} <b class="${dirCls(m.d1)}">${fmtChg(m.sym,m.d1)}</b></span>`).join(', '));
+  $('delta').innerHTML = `<b>어제 대비</b> · ` + (parts.length>1||fresh.length||gone.length||mv.length ? parts.join(' · ') : '큰 변화 없음 · '+parts.join(''));
+}
 let busy=false;
 async function refresh(){
   if(busy) return; busy=true;
@@ -872,6 +940,7 @@ async function refresh(){
   computeDerived(DATA);
   METRICS={}; for(const s of Object.keys(META)){ const m=metrics(s,DATA[s]); if(m) METRICS[s]=m; }
   INSIGHTS = buildInsights(METRICS);
+  try{ PREV = computePrev(res.items); }catch(e){ PREV=null; console.warn(e); }
   const st=$('status');
   if(MODE==='live'){ st.className='badge live'; st.textContent= SRC==='static'?'실제 시세':'실시간(약 15분 지연)'; }
   else { st.className='badge demo'; st.textContent='데모 데이터'; st.title='로컬 서버(node server.js)로 실행하면 실제 시세를 받아옵니다'; }
