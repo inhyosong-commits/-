@@ -34,6 +34,21 @@ header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px so
 .hrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:8px}
 nav.sec{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 nav.sec::-webkit-scrollbar{display:none}
+.tabs{display:flex;gap:4px;margin:0 0 8px;background:var(--surface-2);border-radius:10px;padding:3px}
+.tabs button{flex:1;min-height:36px;border:0;border-radius:8px;background:none;color:var(--text-secondary);font-size:14px;font-weight:600;cursor:pointer}
+.tabs button.on{background:var(--surface);color:var(--text-primary);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+body.pick nav.sec, body.pick #tab-mkt{display:none} body:not(.pick) #tab-pick{display:none}
+.pbox{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin:10px 0}
+.pbox h3{margin:0 0 4px;font-size:16px} .pbox .pd{color:var(--text-secondary);font-size:13px;margin:0 0 8px;line-height:1.5}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) auto 40px;gap:8px;align-items:center;padding:10px 2px;border-top:1px solid var(--border);cursor:pointer}
+.prow .pn{font-weight:600;font-size:14.5px} .prow .pn small{font-weight:400;color:var(--text-muted);font-size:12px;margin-left:4px}
+.prow .pw{font-size:12.5px;color:var(--text-secondary);margin-top:3px;line-height:1.45}
+.prow .pr{text-align:right;font-variant-numeric:tabular-nums;font-size:13px;white-space:nowrap}
+.prow .st{min-width:40px;min-height:40px;padding:0;font-size:18px;background:none;border:0;color:var(--text-muted)} .prow .st.on{color:var(--st-warn)}
+.tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:5px;margin-right:4px;background:var(--surface-2);color:var(--text-secondary)}
+.tag.g{color:var(--st-good)} .tag.b{color:var(--st-serious)}
+.srank{display:flex;flex-wrap:wrap;gap:6px}
+.disc{font-size:12.5px;color:var(--text-secondary);background:var(--surface-2);border-radius:10px;padding:10px 12px;line-height:1.5;margin:10px 0}
 nav.sec a{flex:none;font-size:13px;color:var(--text-secondary);text-decoration:none;padding:6px 12px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border)}
 nav.sec a b{color:var(--st-serious);font-weight:700;margin-left:3px}
 html{scroll-padding-top:110px}
@@ -245,9 +260,15 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
     <button id="theme" title="밝게/어둡게" aria-label="밝게/어둡게">◐</button>
   </div>
   <div class="note" id="updated" style="margin:-4px 0 6px"></div>
+  <div class="tabs" role="tablist"><button data-tab="mkt" class="on">시장 보기</button><button data-tab="pick">종목 고르기</button></div>
   <nav class="sec" id="secnav"></nav>
 </header>
 <main>
+  <div id="tab-pick">
+    <div class="disc"><b>추천이 아니라 "살펴볼 후보"예요.</b> 지금의 거시 환경(금리·환율·원자재 흐름)과 주가 흐름만 보고 기계적으로 분류했습니다. 회사 실적, 가격 수준(비싼지 싼지), 내 상황은 반영하지 않았어요. 투자 결정은 꼭 직접 확인하고 내려 주세요.</div>
+    <div id="pick"></div>
+  </div>
+  <div id="tab-mkt">
   <section id="s-world">
   <div class="world">
     <div class="wl" id="briefDate">오늘의 브리핑</div>
@@ -296,6 +317,7 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
 
   <section id="s-all"><h2>전체 지표 <small>눌러서 펼치기 · 오른쪽은 오늘 가장 크게 움직인 것</small></h2>
   <div id="groups"></div></section>
+  </div>
 </main>
 
 <div class="modal" id="modal">
@@ -1011,9 +1033,75 @@ function drawSector(){
       <button class="st ${on?'on':''}" data-star="${s}" aria-label="관심종목">${on?'★':'☆'}</button></div>`;
   }).join('');
 }
+/* ---- 종목 고르기 탭 ---- */
+function setTab(t){
+  document.body.classList.toggle('pick', t==='pick');
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===t));
+  try{ localStorage.setItem('cmTab', t); }catch(_){}
+  window.scrollTo(0,0);
+}
+function pickData(){
+  const secs = SECTORS.map(sec=>({sec, st:sectorStats(sec)})).sort((a,b)=>b.st.score-a.st.score);
+  const rows=[];
+  for(const {sec,st} of secs) for(const [s,name] of sec.stocks){
+    const m=METRICS[s]; if(!m||m.m3==null) continue;
+    const env = st.score>=0.5?1: st.score<=-0.5?-1:0;
+    const trend = (m.vsMa50>0&&m.m3>0)?1 : (m.vsMa50<0&&m.m3<0)?-1 : 0;
+    const dd = (m.last/m.hi-1)*100;
+    const tails=st.drv.filter(d=>d.eff>=0.5).map(d=>d.label), heads=st.drv.filter(d=>d.eff<=-0.5).map(d=>d.label);
+    rows.push({s,name,sec,st,m,env,trend,dd,tails,heads,score:st.score*1.0+trend*0.8+(m.z21||0)*0.15});
+  }
+  rows.sort((a,b)=>b.score-a.score);
+  return { secs, A:rows.filter(r=>r.env===1&&r.trend===1), B:rows.filter(r=>r.env===1&&r.trend<=0),
+    C:rows.filter(r=>r.env===0&&r.trend===1), D:rows.filter(r=>r.env===-1&&r.trend===-1).sort((a,b)=>a.score-b.score) };
+}
+function pickRow(r){
+  const on=PREFS.watch.includes(r.s);
+  const envT = r.env===1?`<span class="tag g">환경 순풍</span>`: r.env===-1?`<span class="tag b">환경 역풍</span>`:`<span class="tag">환경 중립</span>`;
+  const trT = r.trend===1?`<span class="tag g">상승 흐름</span>`: r.trend===-1?`<span class="tag b">하락 흐름</span>`:`<span class="tag">방향 없음</span>`;
+  const why = r.env===1&&r.tails.length? `${r.tails.slice(0,2).join(', ')} 흐름이 ${r.sec.name}에 유리` : r.env===-1&&r.heads.length? `${r.heads.slice(0,2).join(', ')} 흐름이 ${r.sec.name}에 부담` : `${r.sec.name} 업종`;
+  return `<div class="prow" data-sym="${r.s}"><div><div class="pn">${esc(r.name)}<small>${r.sec.name}</small></div>
+    <div class="pw">${envT}${trT}<span class="tag">고점 대비 ${r.dd.toFixed(0)}%</span><br>${why}</div></div>
+    <div class="pr ${dirCls(r.m.m1)}">1개월<br>${arrow(r.m.m1)} ${pct(r.m.m1)}</div>
+    <button class="st ${on?'on':''}" data-star="${r.s}" aria-label="관심종목">${on?'★':'☆'}</button></div>`;
+}
+function pickBox(title, desc, list, n){
+  if(!list.length) return `<div class="pbox"><h3>${title}</h3><p class="pd">${desc}</p><p class="note">지금은 해당 종목이 없어요.</p></div>`;
+  return `<div class="pbox"><h3>${title} <span class="note">${list.length}개</span></h3><p class="pd">${desc}</p>${list.slice(0,n).map(pickRow).join('')}</div>`;
+}
+function pickPrompt(){
+  const P=pickData(), L=r=>`- ${r.name}(${r.sec.name}): 1개월 ${pct(r.m.m1)}, 3개월 ${pct(r.m.m3)}, 1년 고점 대비 ${r.dd.toFixed(0)}%`;
+  return `내 대시보드가 지금 거시 환경과 주가 흐름으로 종목 후보를 골랐어. 이 후보들을 최신 국내외 뉴스와 실적 전망을 검색해서 검증해줘.
+
+답변 방식(꼭 지켜줘):
+- 나는 전문가가 아니야. 친구가 카톡으로 설명하듯 쉽게, 전문 용어는 괄호로 풀어줘. 숫자는 꼭 필요한 것만.
+- 종목마다: ① 왜 좋아 보일 수 있는지 ② 지금 가장 큰 위험 ③ 영향 사슬 하나 (예: 금리 하락 → 성장주 부담 감소 → 주가 유리) ④ 이미 많이 올라 비싼지 여부
+- 마지막에: 이 후보들 중 "더 알아볼 가치가 큰 순서"와 그 이유, 그리고 몇 주~몇 달 시나리오 2개(좋은 경우/나쁜 경우).
+- 확정적으로 말하지 말고, 최종 판단은 내가 할 수 있게 근거 위주로.
+
+[먼저 살펴볼 후보: 환경 순풍 + 상승 흐름]
+${P.A.slice(0,6).map(L).join('\n')||'- 없음'}
+[지켜볼 후보: 환경은 좋은데 주가는 쉬는 중]
+${P.B.slice(0,4).map(L).join('\n')||'- 없음'}
+[조심: 환경 역풍 + 하락 흐름]
+${P.D.slice(0,3).map(L).join('\n')||'- 없음'}`;
+}
+function renderPick(){
+  const el=$('pick'); if(!el) return;
+  const P=pickData();
+  const srank = `<div class="pbox"><h3>① 지금 바람이 부는 업종</h3><p class="pd">금리·환율·원자재 등 최근 1개월 거시 흐름이 각 업종에 유리한지 불리한지로 줄 세웠어요. 눌러서 자세히 보기.</p>
+    <div class="srank">${P.secs.map(({sec,st})=>`<span class="chip" data-sec-open="${sec.id}">${sec.name} <span class="wind ${st.wind}">${WIND[st.wind]}</span></span>`).join('')}</div></div>`;
+  el.innerHTML = srank
+    + pickBox('② 먼저 살펴볼 후보','업종 환경이 순풍이고, 주가도 상승 흐름(50일 평균 위, 3개월 상승)인 종목. 바람과 흐름이 같은 방향이에요.', P.A, 8)
+    + pickBox('③ 지켜볼 후보','업종 환경은 순풍인데 주가는 쉬거나 내려온 종목. 흐름이 돌아서는지 지켜볼 만해요.', P.B, 6)
+    + pickBox('④ 주가만 강한 종목','업종 환경은 중립인데 주가는 오르는 종목. 회사 자체 이슈(실적, 수주 등)로 오르는 경우가 많아요.', P.C, 5)
+    + pickBox('⑤ 조심할 종목','업종 환경도 역풍이고 주가도 하락 흐름인 종목. 바닥 신호가 나오기 전엔 서두르지 않는 게 일반적이에요.', P.D, 5)
+    + `<div class="pbox"><h3>⑥ AI에게 검증받기</h3><p class="pd">위 후보들을 그대로 넣은 질문으로 열려요. 뉴스와 실적 전망으로 왜 좋아 보이는지, 위험은 뭔지, 이미 비싼지 확인해 줍니다.</p><div class="askrow">${askButtons(pickPrompt(),'pick')}</div></div>`
+    + `<p class="note">분류 기준: 환경 = 업종의 거시 순풍·역풍 점수(섹터 화면과 같음), 흐름 = 50일 평균 대비 위치와 3개월 수익률. ☆를 누르면 내 관심종목에 추가돼요.</p>`;
+}
 function renderAll(){
   if(!Object.keys(METRICS).length) return;
-  renderWatch(); renderRegime(); renderInsights(); renderSectors(); renderGroups();
+  renderWatch(); renderRegime(); renderInsights(); renderSectors(); renderGroups(); renderPick();
   if(curSec&&$('secm').classList.contains('open')) drawSector();
   for(const [id] of SECTIONS){ const el=$(id); if(el) el.style.display=isHidden(id)?'none':''; }
 }
@@ -1184,12 +1272,12 @@ ${askLines(sec.stocks.map(x=>x[0]))}
 [거시 동인]
 ${st.drv.map(d=>`${d.label}: 1개월 ${fmtChg(d.s,d.m.m1)} (${d.eff>=0.5?'순풍':d.eff<=-0.5?'역풍':'중립'})`).join('\n')}`;
 }
-function askButtons(prompt){
+function askButtons(prompt, copyKey){
   const q=encodeURIComponent(prompt);
   return `<a class="askb pplx" href="https://www.perplexity.ai/search?q=${q}" target="_blank" rel="noopener noreferrer">Perplexity로 분석 받기</a>
     <a class="askb" href="https://claude.ai/new?q=${q}" target="_blank" rel="noopener noreferrer">Claude로 분석 받기</a>
     <a class="askb" href="https://chatgpt.com/?hints=search&q=${q}" target="_blank" rel="noopener noreferrer">ChatGPT로 분석 받기</a>
-    <button class="askb" data-copy="1">질문 복사</button>`;
+    <button class="askb" data-copy="${copyKey||1}">질문 복사</button>`;
 }
 let LAST_PROMPT='';
 function renderAsk(){
@@ -1283,8 +1371,9 @@ document.addEventListener('click', e=>{
   const tg=t.closest('[data-tg]'); if(tg){ const s=tg.dataset.tg; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); return; }
   if(t===$('edit')){ $('edit').classList.remove('open'); return; }
   const og=t.closest('[data-open-g]'); if(og){ const d=document.querySelector(`details[data-g="${og.dataset.openG}"]`); if(d) d.open=true; }
-  const cp=t.closest('[data-copy]'); if(cp){ const prompt = $('secm').classList.contains('open') ? sectorPrompt(SECTORS.find(x=>x.id===curSec)) : askPrompt();
+  const cp=t.closest('[data-copy]'); if(cp){ const prompt = cp.dataset.copy==='pick' ? pickPrompt() : $('secm').classList.contains('open') ? sectorPrompt(SECTORS.find(x=>x.id===curSec)) : askPrompt();
     navigator.clipboard.writeText(prompt).then(()=>{ cp.textContent='복사됨 ✓'; setTimeout(()=>cp.textContent='질문 복사',1500); }).catch(()=>{ cp.textContent='복사 실패'; }); return; }
+  const tb=t.closest('[data-tab]'); if(tb){ setTab(tb.dataset.tab); return; }
   const star=t.closest('[data-star]'); if(star){ const s=star.dataset.star; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); return; }
   const so=t.closest('[data-sec-open]'); if(so){ openSector(so.dataset.secOpen); return; }
   if(t===$('secm')){ $('secm').classList.remove('open'); return; }
@@ -1297,6 +1386,7 @@ document.addEventListener('click', e=>{
 document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ if($('modal').classList.contains('open')) closeModal(); else { $('edit').classList.remove('open'); $('secm').classList.remove('open'); } } if(e.key==='Enter'&&e.target.dataset&&e.target.dataset.sym) openModal(e.target.dataset.sym); });
 $('mClose').onclick=closeModal;
 $('mStar').onclick=()=>{ const s=curSym; PREFS.watch = PREFS.watch.includes(s)? PREFS.watch.filter(x=>x!==s) : [...PREFS.watch, s]; applyPrefs(); drawModal(); };
+try{ if(location.hash==='#pick'||localStorage.getItem('cmTab')==='pick') setTab('pick'); }catch(_){}
 $('editBtn').onclick=()=>{ renderEdit(); $('edit').classList.add('open'); };
 $('sClose').onclick=()=>$('secm').classList.remove('open');
 $('eClose').onclick=()=>$('edit').classList.remove('open');
