@@ -49,8 +49,12 @@ async function fundamentals(x) {
   const f = { fin: null, eps: null, flow: null, finNote: null, epsNote: null, flowNote: null };
   const p2 = Math.floor(Date.now() / 1000), p1 = p2 - 86400 * 820;
   try { // 분기 영업이익: 최근 분기 vs 1년 전 같은 분기
-    const j = await J(`https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(x.s)}?type=quarterlyOperatingIncome&period1=${p1}&period2=${p2}`);
-    const arr = ((j.timeseries.result || [])[0] || {}).quarterlyOperatingIncome || [];
+    const TY = ['OperatingIncome', 'StockholdersEquity', 'TotalLiabilitiesNetMinorityInterest', 'CurrentAssets', 'CurrentLiabilities', 'CashAndCashEquivalents'];
+    const types = TY.flatMap(k => ['quarterly' + k, 'annual' + k]).join(',');
+    const j = await J(`https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(x.s)}?type=${types}&period1=${p1}&period2=${p2}`);
+    const G = {}; for (const r of j.timeseries.result || []) for (const [k, a] of Object.entries(r)) if (Array.isArray(a) && /^(quarterly|annual)/.test(k)) G[k] = a.filter(Boolean).map(z => ({ d: z.asOfDate, v: z.reportedValue && z.reportedValue.raw })).filter(z => z.v != null).sort((p, q) => p.d.localeCompare(q.d));
+    f.safe = safetyOf(G, x);
+    const arr = (G.quarterlyOperatingIncome || []).map(z => ({ asOfDate: z.d, reportedValue: { raw: z.v } }));
     const q = arr.filter(Boolean).map(a => ({ d: a.asOfDate, v: a.reportedValue && a.reportedValue.raw })).filter(a => a.v != null).sort((a, b) => a.d.localeCompare(b.d));
     if (q.length >= 5) {
       const a = q[q.length - 1], b = q[q.length - 5];
@@ -71,7 +75,7 @@ async function fundamentals(x) {
   if (/\.K[SQ]$/.test(x.s)) try { // 수급: 최근 5일 vs 그 전 5일 (외국인+기관 순매수 금액)
     const j = await J(`https://m.stock.naver.com/api/stock/${x.s.slice(0, 6)}/integration`, { Referer: 'https://m.stock.naver.com/' });
     const D = j.dealTrendInfos || [], q = k => D.reduce((p, a) => p + (num(a[k]) || 0) * (num(a.closePrice) || 0) / 1e8, 0);
-    if (D.length) f.deal = { days: D.length, fo: Math.round(q('foreignerPureBuyQuant')), in: Math.round(q('organPureBuyQuant')), ind: Math.round(q('individualPureBuyQuant')), fr0: num(String(D[D.length - 1].foreignerHoldRatio || '').replace('%', '')), fr1: num(String(D[0].foreignerHoldRatio || '').replace('%', '')) };
+    if (D.length) f.deal = { daily: D.map(a => ['foreignerPureBuyQuant', 'organPureBuyQuant', 'individualPureBuyQuant'].map(k => Math.round((num(a[k]) || 0) * (num(a.closePrice) || 0) / 1e8))), days: D.length, fo: Math.round(q('foreignerPureBuyQuant')), in: Math.round(q('organPureBuyQuant')), ind: Math.round(q('individualPureBuyQuant')), fr0: num(String(D[D.length - 1].foreignerHoldRatio || '').replace('%', '')), fr1: num(String(D[0].foreignerHoldRatio || '').replace('%', '')) };
     const d = D.map(a => ((num(a.foreignerPureBuyQuant) || 0) + (num(a.organPureBuyQuant) || 0)) * (num(a.closePrice) || 0) / 1e8);
     if (d.length >= 10) { const a = d.slice(0, 5).reduce((p, q) => p + q, 0), b = d.slice(5, 10).reduce((p, q) => p + q, 0); f.flow = a > b && a > 0; f.flowNote = `외국인+기관 최근 5일 ${a >= 0 ? '+' : ''}${Math.round(a).toLocaleString('ko-KR')}억 (그 전 5일 ${b >= 0 ? '+' : ''}${Math.round(b).toLocaleString('ko-KR')}억)`; }
     else if (d.length >= 5) { const a = d.slice(0, 5).reduce((p, q) => p + q, 0); f.flow = a > 0; f.flowNote = `외국인+기관 최근 5일 ${Math.round(a)}억`; }
@@ -79,6 +83,56 @@ async function fundamentals(x) {
   return f;
 }
 
+
+
+// 망하지 않을 회사인지: 자본잠식, 부채비율, 유동비율, 최근 1년 영업이익, 현금으로 버틸 수 있는 기간
+function safetyOf(G, x) {
+  const last = k => { const q = G['quarterly' + k] || [], a = G['annual' + k] || []; const z = [...q, ...a].sort((p, r) => p.d.localeCompare(r.d)); return z.length ? z[z.length - 1] : null; };
+  const eq = last('StockholdersEquity'), li = last('TotalLiabilitiesNetMinorityInterest'), ca = last('CurrentAssets'), cl = last('CurrentLiabilities'), cash = last('CashAndCashEquivalents');
+  const oq = G.quarterlyOperatingIncome || [], oa = G.annualOperatingIncome || [];
+  const op4 = oq.length >= 4 ? oq.slice(-4).reduce((p, r) => p + r.v, 0) : oa.length ? oa[oa.length - 1].v : null;
+  const lossQ = (() => { let n = 0; for (let i = oq.length - 1; i >= 0 && oq[i].v < 0; i--) n++; return n; })();
+  const lossY = (() => { let n = 0; for (let i = oa.length - 1; i >= 0 && oa[i].v < 0; i--) n++; return n; })();
+  const items = []; let bad = 0, good = 0, n = 0;
+  const fin = x.sec === '금융';
+  if (eq) { n++; if (eq.v <= 0) { bad++; items.push(['bad', '자본잠식 (자본이 마이너스)']); } }
+  if (eq && li && eq.v > 0 && !fin) { n++; const r = li.v / eq.v * 100; const t = `부채비율 ${Math.round(r)}%`; if (r < 100) { good++; items.push(['good', t + ' (빚이 자본보다 적음)']); } else if (r > 200) { bad++; items.push(['bad', t + ' (빚이 자본의 2배 넘음)']); } else items.push(['mid', t]); }
+  if (ca && cl && cl.v > 0 && !fin) { n++; const r = ca.v / cl.v * 100; const t = `유동비율 ${Math.round(r)}%`; if (r >= 150) { good++; items.push(['good', t + ' (1년 안에 갚을 돈 충분)']); } else if (r < 100) { bad++; items.push(['bad', t + ' (1년 안에 갚을 빚이 현금성 자산보다 많음)']); } else items.push(['mid', t]); }
+  if (op4 != null) { n++; if (op4 > 0) { good++; items.push(['good', '최근 1년 영업이익 흑자']); } else {
+    items.push(['bad', `최근 1년 영업적자${lossQ >= 4 ? ` (${lossQ}분기 연속)` : ''}${lossY >= 3 ? `, ${lossY}년 연속` : ''}`]); bad++;
+    if (cash) { const yrs = cash.v / -op4; items.push([yrs < 1 ? 'bad' : 'mid', `현금으로 지금 적자를 약 ${yrs < 1 ? Math.max(1, Math.round(yrs * 12)) + '개월' : yrs.toFixed(1) + '년'} 버틸 수 있음`]); if (yrs < 1) bad++; } } }
+  if (!n) return null;
+  return { lv: bad >= 2 || (eq && eq.v <= 0) ? 2 : bad === 1 ? 1 : 0, items, asOf: eq ? eq.d : op4 != null && oq.length ? oq[oq.length - 1].d : null };
+}
+// 운전자(세력) 신호: 큰돈이 들어와 주가를 끌고 가는 흔적 / 빠져나가는 흔적
+function driverOf(c, v, e, F, x) {
+  const sig = [], out = [];
+  const med = a => { const b = a.filter(z => z > 0).sort((p, q) => p - q); return b[Math.floor(b.length / 2)] || 0; };
+  const base = med(v.slice(e - 80, e - 20));
+  let bi = null; // 최근 20일 중 가장 큰 거래량 + 상승일
+  for (let i = e - 19; i <= e; i++) { const r = c[i] / c[i - 1] - 1; if (base > 0 && v[i] >= base * 3 && r >= 0.05 && (bi == null || v[i] > v[bi])) bi = i; }
+  if (bi != null) {
+    sig.push(`${e - bi === 0 ? '오늘' : (e - bi) + '거래일 전'} 평소 ${Math.round(v[bi] / base)}배 거래량으로 ${((c[bi] / c[bi - 1] - 1) * 100).toFixed(0)}% 상승 (큰돈 진입 흔적)`);
+    const mid = (c[bi] + c[bi - 1]) / 2, minAfter = Math.min(...c.slice(bi, e + 1));
+    if (bi < e - 1 && minAfter >= mid) sig.push('그 뒤로 급등분의 절반 아래로 안 밀림 (가격을 받쳐 주는 손이 있음)');
+    if (c[e] < c[bi - 1]) out.push('큰 거래량으로 오르기 전 가격 아래로 다시 내려감 (급등분 반납)');
+  }
+  const pre = v.slice(e - 40, e - 20).filter(z => z > 0), preAvg = pre.reduce((p, q) => p + q, 0) / (pre.length || 1);
+  if (base > 0 && preAvg < base * 0.7 && bi != null) sig.push('거래가 말라 있다가 갑자기 터짐 (조용히 모은 뒤 움직이는 모양)');
+  const dv = i => c[i] * (v[i] || 0), avg = (a, b) => { let s = 0, n = 0; for (let i = a; i <= b; i++) { s += dv(i); n++; } return s / n; };
+  const r = avg(e - 19, e) / (avg(e - 80, e - 20) || 1); if (r >= 2) sig.push(`최근 20일 거래대금이 평소의 ${r.toFixed(1)}배`);
+  for (let i = e - 9; i <= e; i++) { const rr = c[i] / c[i - 1] - 1; if (base > 0 && v[i] >= base * 3 && rr <= -0.05) { out.push(`${e - i === 0 ? '오늘' : (e - i) + '거래일 전'} 큰 거래량으로 ${(rr * 100).toFixed(0)}% 하락 (물량 털기 의심)`); break; } }
+  const dl = F && F.deal;
+  if (dl && dl.daily && dl.daily.length >= 5) {
+    const d5 = dl.daily.slice(0, 5), fB = d5.filter(z => z[0] > 0).length, iB = d5.filter(z => z[1] > 0).length;
+    if (fB >= 4) sig.push(`외국인 최근 5일 중 ${fB}일 순매수`);
+    if (iB >= 4) sig.push(`기관 최근 5일 중 ${iB}일 순매수`);
+    if (dl.fo + dl.in > 0 && dl.ind < 0 && x.cap > 0 && (dl.fo + dl.in) * 1e8 / x.cap >= 0.002) sig.push(`외국인·기관이 사고 개인이 판 물량 ${(dl.fo + dl.in).toLocaleString('ko-KR')}억 (시총의 ${((dl.fo + dl.in) * 1e10 / x.cap).toFixed(1)}%)`);
+    if (d5.filter(z => z[0] < 0).length >= 4 && d5.filter(z => z[1] < 0).length >= 4) out.push('외국인·기관 둘 다 최근 5일 중 4일 이상 순매도');
+  }
+  const lv = out.length >= 2 || (out.length && sig.length <= 1) ? -1 : sig.length >= 3 && !out.length ? 2 : sig.length >= 2 || (sig.length && !out.length) ? 1 : 0;
+  return { lv, sig, out };
+}
 
 // 매집 현황: 거래량 흐름(OBV) + 한국은 외국인·기관·개인 순매수(최근 10거래일)와 외국인 지분율
 function accOf(c, v, e, F, x) {
@@ -183,8 +237,8 @@ const ymd = t => new Date((t + 9 * 3600) * 1000).toISOString().slice(0, 10);
     if (ix[e] && ma60i && ix[e] < ma60i) risk.push('시장 지수가 60일선 아래 (시장 전체 약세)');
     if (F.fin === false) risk.push('실적 개선 미확인');
     const gcDate = t.gc != null ? ymd(d.t[t.gc]) : null;
-    const acc = accOf(c, v, e, F, x), mp = manipOf(c, v, e, F, x);
-    out.push({ s: x.s, n: x.n, mk: x.mk, cap: x.cap, acc, mp, sec: x.sec || null, cur: x.cur, px: +c[e].toPrecision(6), d1: +((c[e] / c[e - 1] - 1) * 100).toFixed(2), asOf: ymd(d.t[e]), V,
+    const acc = accOf(c, v, e, F, x), mp = manipOf(c, v, e, F, x), drv = driverOf(c, v, e, F, x), safe = F.safe || null;
+    out.push({ s: x.s, n: x.n, mk: x.mk, cap: x.cap, acc, mp, drv, safe, sec: x.sec || null, cur: x.cur, px: +c[e].toPrecision(6), d1: +((c[e] / c[e - 1] - 1) * 100).toFixed(2), asOf: ymd(d.t[e]), V,
       det: { low: [ymd(d.t[t.mlo]), +t.low.toPrecision(6)], hl: t.hlIdx != null ? [ymd(d.t[t.hlIdx]), +c[t.hlIdx].toPrecision(6)] : null, refHi: t.refHi != null ? [ymd(d.t[t.refHiIdx]), +t.refHi.toPrecision(6)] : null,
         brk: t.brkIdx != null ? ymd(d.t[t.brkIdx]) : null, gc: gcDate, ma60x: t.crossUp != null ? ymd(d.t[t.crossUp]) : null, volx: t.volx, ma20: +t.ma20.toPrecision(6), ma60: +t.ma60.toPrecision(6), ma120: +t.ma120.toPrecision(6), rsi: Math.round(t.rsi),
         fin: F.finNote, eps: F.epsNote, flow: F.flowNote, risk } });
@@ -197,6 +251,7 @@ const ymd = t => new Date((t + 9 * 3600) * 1000).toISOString().slice(0, 10);
   const st = k => out.filter(x => x.V[DEF] && x.V[DEF][2] === k).length;
   console.log('결과:', out.length, '종목 | 1단계', st(1), '/ 2단계', st(2), '/ 3단계', st(3), '| NEW', out.filter(x => x.V[DEF] && x.V[DEF][5].length).length, '|', ((Date.now() - t0) / 1000).toFixed(0) + '초');
   console.log('크기:', (fs.statSync(path.join(OUT, 'reversal.json')).size / 1024).toFixed(0) + 'KB,', (fs.statSync(path.join(OUT, 'revseries.json')).size / 1024).toFixed(0) + 'KB');
+  console.log('운전자 신호 강함', out.filter(x => x.drv.lv === 2).length, '/ 있음', out.filter(x => x.drv.lv === 1).length, '/ 이탈', out.filter(x => x.drv.lv === -1).length, '| 재무 안전', out.filter(x => x.safe && x.safe.lv === 0).length, '/ 보통', out.filter(x => x.safe && x.safe.lv === 1).length, '/ 위험', out.filter(x => x.safe && x.safe.lv === 2).length, '/ 없음', out.filter(x => !x.safe).length);
   console.log('매집 신호', out.filter(x => x.acc.lv === 1).length, '/ 작전 주의', out.filter(x => x.mp.lv === 1).length, '/ 작전 높음', out.filter(x => x.mp.lv === 2).length);
   console.log('상위 5:', out.slice(0, 5).map(x => `${x.n}(${x.V[DEF] && x.V[DEF][0]}점, ${x.V[DEF] && x.V[DEF][2]}단계)`).join(', '));
 })().catch(e => { console.error('스캔 실패:', e); process.exit(1); });

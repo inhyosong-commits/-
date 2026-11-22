@@ -285,7 +285,7 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
 .stgd{font-size:12.5px;line-height:1.5;color:var(--text-muted);margin:2px 0 8px;padding:8px 10px;border-radius:8px;background:var(--surface-1)} .stgd b{color:var(--text);margin-right:4px}
 .rtg{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0;font-size:12px} .capt{color:var(--text-muted)}
 .tg{font-size:11px;font-weight:600;padding:1px 6px;border-radius:6px;border:1px solid}
-.tg-acc{color:#2b8a3e;border-color:#2b8a3e} .tg-out{color:var(--down);border-color:var(--down)} .tg-mp2{background:#c92a2a;color:#fff;border-color:#c92a2a} .tg-mp1{color:#e8590c;border-color:#e8590c} .tg-mp0{color:var(--text-muted);border-color:var(--grid)}
+.tg-drv2{background:#2b8a3e;color:#fff;border-color:#2b8a3e} .tg-acc{color:#2b8a3e;border-color:#2b8a3e} .tg-out{color:var(--down);border-color:var(--down)} .tg-mp2{background:#c92a2a;color:#fff;border-color:#c92a2a} .tg-mp1{color:#e8590c;border-color:#e8590c} .tg-mp0{color:var(--text-muted);border-color:var(--grid)}
 </style>
 </head>
 <body>
@@ -1663,7 +1663,7 @@ function drawModal(){
 
 /* ---- 상승 전환 후보 찾기 (독립 모듈: reversal.json / revseries.json만 사용) ---- */
 let REV=null, REVS=null, REV_ERR=null, revLoading=null;
-const REV_DEF={mk:'all',ex:'all',sec:'all',cap:'all',mp:'all',acc:'all',L:126,min:60,vm:1.5,fin:false,stage:'2',sort:'score'};
+const REV_DEF={mk:'all',ex:'all',sec:'all',cap:'all',mp:'all',acc:'all',drv:'all',safe:'all',L:126,min:60,vm:1.5,fin:false,stage:'2',sort:'score'};
 let RF=Object.assign({},REV_DEF); try{ Object.assign(RF, JSON.parse(localStorage.getItem('cmRev')||'{}')); }catch(_){}
 const saveRF=()=>{ try{ localStorage.setItem('cmRev',JSON.stringify(RF)); }catch(_){} };
 function loadRev(){
@@ -1692,12 +1692,16 @@ function revRows(){
     if(RF.cap!=='all'&&capTier(x)!==RF.cap) continue;
     if(RF.mp==='nohi'&&x.mp&&x.mp.lv===2) continue; if(RF.mp==='low'&&x.mp&&x.mp.lv>0) continue;
     if(RF.acc==='yes'&&!(x.acc&&x.acc.lv===1)) continue;
+    if(RF.drv==='on'&&!(x.drv&&x.drv.lv>=1)) continue; if(RF.drv==='strong'&&!(x.drv&&x.drv.lv===2)) continue;
+    if(RF.safe==='nobad'&&x.safe&&x.safe.lv===2) continue; if(RF.safe==='ok'&&!(x.safe&&x.safe.lv===0)) continue;
+    if(RF.mp==='has'&&!(x.mp&&x.mp.lv>0)) continue;
     if(v.sc<RF.min) continue;
     if(RF.stage!=='all'&&String(v.st)!==RF.stage) continue;
     if(RF.fin&&!(revIt(v,'fin')===true||revIt(v,'eps')===true)) continue;
     out.push({x,v});
   }
-  out.sort((a,b)=> RF.sort==='new' ? ((b.v.nw.length>0)-(a.v.nw.length>0)) || b.v.sc-a.v.sc : b.v.sc-a.v.sc || (b.v.nw.length>0)-(a.v.nw.length>0));
+  const dl=x=>x.drv?x.drv.lv:0;
+  out.sort((a,b)=> RF.sort==='drv' ? dl(b.x)-dl(a.x) || b.v.sc-a.v.sc : RF.sort==='new' ? ((b.v.nw.length>0)-(a.v.nw.length>0)) || b.v.sc-a.v.sc : b.v.sc-a.v.sc || (b.v.nw.length>0)-(a.v.nw.length>0));
   return out;
 }
 const revPx=(x,p)=> p==null?'–': x.cur==='KRW'? Math.round(p).toLocaleString('ko-KR')+'원' : '$'+(+p).toLocaleString('en-US',{maximumFractionDigits:2});
@@ -1711,7 +1715,9 @@ const STG_D={1:'오래 내리거나 옆으로 기다가 저점 근처에서 버�
 const capTxt=x=> x.cur==='KRW' ? (x.cap>=1e12? (x.cap/1e12).toFixed(x.cap>=1e13?0:1)+'조원' : Math.round(x.cap/1e8).toLocaleString('ko-KR')+'억원') : '$'+(x.cap>=1e9? (x.cap/1e9).toFixed(x.cap>=1e11?0:1)+'B' : Math.round(x.cap/1e6)+'M');
 const CAPN={L:'대형',M:'중형',S:'소형'};
 const accB=x=> !x.acc? '' : x.acc.lv===1? '<span class="tg tg-acc">매집 신호</span>' : x.acc.lv===-1? '<span class="tg tg-out">이탈 신호</span>' : '';
-const mpB=x=> !x.mp? '' : x.mp.lv===2? '<span class="tg tg-mp2">작전 의심 높음</span>' : x.mp.lv===1? '<span class="tg tg-mp1">작전 주의</span>' : '<span class="tg tg-mp0">작전 신호 없음</span>';
+const mpB=x=> !x.mp||!x.mp.lv? '' : `<span class="tg ${x.mp.lv===2?'tg-mp2':'tg-mp1'}">작전주 특성 ${x.mp.flags.length}개</span>`;
+const drvB=x=> !x.drv? '' : x.drv.lv===2? '<span class="tg tg-drv2">🚗 운전자 신호 강함</span>' : x.drv.lv===1? '<span class="tg tg-acc">🚗 운전자 신호</span>' : x.drv.lv===-1? '<span class="tg tg-out">운전자 이탈 의심</span>' : '';
+const safeB=x=> !x.safe? '<span class="tg tg-mp0">재무 N/A</span>' : `<span class="tg ${['tg-acc','tg-mp1','tg-mp2'][x.safe.lv]}">재무 ${['안전','보통','위험'][x.safe.lv]}</span>`;
 function revChips(name,opts,cur){ return opts.map(([v,l])=>`<button class="${String(cur)===String(v)?'on':''}" data-rf="${name}" data-rv="${v}">${l}</button>`).join(''); }
 function renderRev(){
   const el=$('rev'); if(!el) return;
@@ -1723,7 +1729,9 @@ function renderRev(){
     <div class="rfr"><span>단계</span>${revChips('stage',[['1','1단계'],['2','2단계'],['3','3단계'],['all','전체']],RF.stage)}</div>
     <p class="stgd"><b>${RF.stage==='all'?'단계란?':STG[RF.stage]}</b> ${STG_D[RF.stage]}</p>
     <div class="rfr"><span>시가총액</span>${revChips('cap',[['all','전체'],['L','대형'],['M','중형'],['S','소형']],RF.cap)}</div>
-    <div class="rfr"><span>작전 의심</span>${revChips('mp',[['all','전체'],['nohi','높음 빼기'],['low','신호 없는 것만']],RF.mp)}</div>
+    <div class="rfr"><span>운전자</span>${revChips('drv',[['all','전체'],['on','신호 있는 것'],['strong','강한 것만']],RF.drv)}</div>
+    <div class="rfr"><span>재무 안전</span>${revChips('safe',[['all','전체'],['nobad','위험 빼기'],['ok','안전만']],RF.safe)}</div>
+    <div class="rfr"><span>작전주 특성</span>${revChips('mp',[['all','전체'],['has','있는 것만'],['low','없는 것만']],RF.mp)}</div>
     <div class="rfr"><span>매집</span>${revChips('acc',[['all','전체'],['yes','매집 신호만']],RF.acc)}</div>
     <div class="rfr"><span>최소 점수</span>${revChips('min',[['0','제한 없음'],['60','60+'],['70','70+'],['80','80+']],RF.min)}</div>
     <details class="rmore"><summary>필터 더 보기 · 업종, 기간, 거래량, 실적</summary>
@@ -1732,7 +1740,7 @@ function renderRev(){
     <div class="rfr"><span>실적</span>${revChips('fin',[['false','상관없음'],['true','실적 개선만']],RF.fin)}</div>
     <div class="rfr"><span>업종</span><select id="revSec"><option value="all">전체</option>${secs.map(s=>`<option ${RF.sec===s?'selected':''}>${esc(s)}</option>`).join('')}</select></div>
     <p class="note">시총 기준: 대형 10조원·100억달러 이상, 중형 1조원·20억달러 이상. 업종은 지금 미국 종목만 나뉘어 있어요.</p></details>
-    <div class="rfr"><span>정렬</span>${revChips('sort',[['score','점수순'],['new','NEW REVERSAL 먼저']],RF.sort)}<button class="sm" data-rf="reset" data-rv="1">초기화</button></div>`;
+    <div class="rfr"><span>정렬</span>${revChips('sort',[['score','점수순'],['new','NEW REVERSAL 먼저'],['drv','운전자 신호 먼저']],RF.sort)}<button class="sm" data-rf="reset" data-rv="1">초기화</button></div>`;
   const rows=revRows(), top=rows.slice(0,20);
   const sc=new Date(REV.scannedAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
   const head=`<p class="note">스캔 ${sc} · 종가 기준 (한국 ${revMd(REV.asOf.KR)}, 미국 ${revMd(REV.asOf.US)}) · 시총 상위 한국 ${REV.universe.KR}·미국 ${REV.universe.US}종목 중 조건 맞는 ${rows.length}개, 위에서 20개</p>`;
@@ -1741,7 +1749,7 @@ function renderRev(){
     const fv = fin===true||eps===true ? true : (fin===false||eps===false) ? false : null;
     return `<div class="rrow" data-rev="${esc(x.s)}">
       <div class="ra"><span class="nmh">${x.cur==='KRW'?'<span class="mk kr">국장</span>':'<span class="mk us">미장</span>'}${esc(x.n)}</span>${isNew?`<span class="newb" title="${esc(v.nw.map(k=>REV_NEW[k]).join(', '))}">NEW REVERSAL</span>`:''}<span class="spacer"></span><b class="rsc">${v.sc}<small>/100</small></b></div>
-      <div class="rtg"><span class="capt">시총 ${capTxt(x)} · ${CAPN[capTier(x)]}</span>${accB(x)}${mpB(x)}</div>
+      <div class="rtg"><span class="capt">시총 ${capTxt(x)} · ${CAPN[capTier(x)]}</span>${drvB(x)}${safeB(x)}${accB(x)}${mpB(x)}</div>
       <div class="rbar"><i style="width:${v.sc}%"></i><u style="width:${v.cov}%"></u></div>
       <div class="rb"><span>${revPx(x,x.px)} <em class="${x.d1>=0?'up':'down'}">${x.d1>=0?'+':''}${x.d1}%</em></span><span>${STG[v.st]}</span><span>저점 대비 +${v.up}%</span><span>거래량 ${v.volx!=null?v.volx.toFixed(1)+'배':'–'}</span><span>실적 ${ynN(fv)}</span><span>수급 ${ynN(flow)}</span><span>첫 신호 ${revMd(v.first2)}</span><span class="note">데이터 ${v.cov}%</span></div></div>`; }).join('')
     : `<div class="empty">지금 조건에 맞는 종목이 없어요. 단계를 '전체'로 바꾸거나 최소 점수를 낮춰 보세요.</div>`);
@@ -1768,7 +1776,7 @@ function revPanel(sym){
   return `<div class="pbox revp"><h3>상승 전환 체크 <span class="note">(${L} · 거래량 ${RF.vm}배 기준)</span></h3>
     <div class="ra"><b class="rsc">${v.sc}<small>/100점</small></b><span>${STG[v.st]}</span>${v.nw.length?`<span class="newb">NEW REVERSAL</span>`:''}<span class="spacer"></span><span class="note">데이터 ${v.cov}%</span></div>
     <p class="pd">${STG[v.st]==='해당 없음'?'지금 설정(기간·거래량 기준)에서는 어느 단계에도 해당하지 않아요.':STG_D[v.st]}</p>
-    <div class="rtg"><span class="capt">시총 ${capTxt(x)} · ${CAPN[capTier(x)]}</span>${accB(x)}${mpB(x)}</div>
+    <div class="rtg"><span class="capt">시총 ${capTxt(x)} · ${CAPN[capTier(x)]}</span>${drvB(x)}${safeB(x)}${accB(x)}${mpB(x)}</div>
     ${v.nw.length?`<p class="pd">새 신호: ${v.nw.map(k=>REV_NEW[k]).join(', ')}</p>`:''}
     <ul class="rit">${items}</ul>
     <div class="stats rst">
@@ -1781,8 +1789,10 @@ function revPanel(sym){
       <div>20 / 60 / 120일선<b>${revPx(x,d.ma20)} / ${revPx(x,d.ma60)} / ${revPx(x,d.ma120)}</b></div>
       <div>RSI(14)<b>${d.rsi}</b></div></div>
     <p class="pd">실적: ${esc(d.fin||'N/A (데이터 없음)')}<br>전망: ${esc(d.eps||'N/A (데이터 없음)')}<br>수급: ${esc(d.flow||(x.cur==='USD'?'N/A (미국 종목은 수급 데이터 없음)':'N/A (데이터 없음)'))}</p>
+    ${x.drv?`<h3 style="margin-top:10px">🚗 운전자(세력) 신호</h3>${x.drv.sig.length?`<ul class="tl">${x.drv.sig.map(r=>`<li>✅ ${esc(r)}</li>`).join('')}</ul>`:'<p class="pd">큰돈이 들어와 끌고 가는 흔적은 아직 안 보여요.</p>'}${x.drv.out.length?`<ul class="tl">${x.drv.out.map(r=>`<li>🚨 ${esc(r)}</li>`).join('')}</ul>`:''}<p class="note">거래량·가격·투자자별 매매로 추정한 거예요. 누가 샀는지 직접 알 수는 없고, 운전자가 언제 내릴지는 아무도 몰라요. 이탈 신호가 뜨면 특히 조심하세요.</p>`:''}
+    <h3 style="margin-top:10px">재무 안전 체크 <span class="note">(망하지 않을 회사인지)</span></h3>${x.safe?`<ul class="tl">${x.safe.items.map(([k,t])=>`<li>${k==='good'?'✅':k==='bad'?'⛔':'➖'} ${esc(t)}</li>`).join('')}</ul><p class="note">${x.safe.asOf?x.safe.asOf.slice(0,7)+' 재무제표 기준. ':''}부채비율 100% 미만, 유동비율 150% 이상, 1년 흑자면 안전 쪽이에요.</p>`:'<p class="pd">N/A (재무제표 데이터를 못 받았어요)</p>'}
     ${x.acc?`<h3 style="margin-top:10px">매집 현황</h3><ul class="tl">${x.acc.notes.map(r=>`<li>${esc(r)}</li>`).join('')}</ul>`:''}
-    ${x.mp?`<h3 style="margin-top:10px">작전주 의심 체크 <span class="note">${['신호 없음','주의','높음'][x.mp.lv]}</span></h3>${x.mp.flags.length?`<ul class="tl">${x.mp.flags.map(r=>`<li>🚩 ${esc(r)}</li>`).join('')}</ul>`:'<p class="pd">시총, 거래량 폭발, 급등, 큰 등락, 개인만 매수 같은 의심 신호가 안 보여요.</p>'}<p class="note">작전 여부를 판정하는 게 아니라 흔히 보이는 패턴을 체크한 거예요. 투자경고·관리종목 지정은 KRX 공시에서 꼭 확인하세요.</p>`:''}
+    ${x.mp?`<h3 style="margin-top:10px">작전주 특성 체크 <span class="note">${x.mp.flags.length}개</span></h3>${x.mp.flags.length?`<ul class="tl">${x.mp.flags.map(r=>`<li>🚩 ${esc(r)}</li>`).join('')}</ul>`:'<p class="pd">시총, 거래량 폭발, 급등, 큰 등락, 개인만 매수 같은 의심 신호가 안 보여요.</p>'}<p class="note">작전 여부를 판정하는 게 아니라 작전주에 흔한 특징(가볍고 잘 튀는 종목)을 센 거예요. 특성이 많을수록 빨리 오르고 빨리 무너질 수 있어요. 투자경고·관리종목 지정은 KRX 공시에서 꼭 확인하세요.</p>`:''}
     <h3 style="margin-top:10px">전환 실패 위험 신호</h3>${d.risk&&d.risk.length?`<ul class="tl">${d.risk.map(r=>`<li>⚠️ ${esc(r)}</li>`).join('')}</ul>`:'<p class="pd">지금 보이는 위험 신호는 없어요.</p>'}
     <p class="note">점수는 오를 확률이 아니라 10가지 조건 중 몇 개를 채웠는지예요. N/A는 데이터가 없어 0점 처리한 항목입니다. ${revMd(x.asOf)} 종가 기준.</p></div>`;
 }
