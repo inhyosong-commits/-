@@ -13,7 +13,9 @@ const { fetchMany } = require('../lib/yahoo');
   const syms = [...block.matchAll(/\['[a-z]+','([^']+)'/g)].map(m => m[1]);
   const sb = html.slice(html.indexOf('const SECTORS = ['), html.indexOf('const STOCK_SECTOR'));
   for (const m of sb.matchAll(/\['([^']+)','[^']+'\]/g)) if (!syms.includes(m[1])) syms.push(m[1]);
-  console.log('종목', syms.length, '개');
+  let extra = []; try { extra = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'config', 'extra-stocks.json'), 'utf8')); } catch (_) {}
+  for (const x of extra) if (!syms.includes(x.sym)) syms.push(x.sym);
+  console.log('종목', syms.length, '개 (직접 추가', extra.length, '개)');
 
   const { items, errors } = await fetchMany(syms, '1y', 4);
   // 실패한 종목은 이전 데이터로 채움
@@ -28,6 +30,6 @@ const { fetchMany } = require('../lib/yahoo');
   if (ok < 20) { console.error('데이터가 너무 적어 배포하지 않습니다'); process.exit(1); }
   // 용량 줄이기: 유효숫자 6자리
   for (const v of Object.values(items)) v.c = v.c.map(x => +x.toPrecision(6));
-  fs.writeFileSync(out, JSON.stringify({ source: 'yahoo', fetchedAt: Date.now(), items, errors }));
+  fs.writeFileSync(out, JSON.stringify({ source: 'yahoo', fetchedAt: Date.now(), items, errors, extra }));
   console.log('저장:', out, (fs.statSync(out).size / 1024).toFixed(0) + 'KB');
 })();

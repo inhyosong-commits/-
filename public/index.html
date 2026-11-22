@@ -381,6 +381,9 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
     <div class="askrow" style="margin:6px 0 4px"><button class="askb" id="eShare">다른 기기로 옮기기 (설정 링크 복사)</button></div>
     <h2>관심종목 순서 <small>맨 위에 이 순서대로 보입니다</small></h2>
     <div id="eWatch"></div>
+    <h2>목록에 없는 종목 추가</h2>
+    <div class="hold" style="margin-top:0">종목 이름이나 코드를 넣고 요청하면, GitHub에서 "Submit"만 누르면 돼요. 3~5분 뒤 새로고침하면 아래 "직접 추가한 종목"에 생겨요. (예: 삼성전기, 247540, TSLA)<br>
+      <label><input id="addQ" type="text" placeholder="이름 또는 코드" style="width:170px"></label><button class="sm" id="addGo">추가 요청</button></div>
     <h2>종목 추가·빼기 <small>눌러서 켜고 끄기</small></h2>
     <div id="eAll"></div>
     <h2>보여줄 섹션</h2>
@@ -577,6 +580,7 @@ async function loadStatic(){
   if(!r.ok) throw new Error('HTTP '+r.status);
   const j = await r.json();
   if(Object.keys(j.items||{}).length < 5) throw new Error('데이터 부족');
+  (j.extra||[]).forEach(x=>{ if(!META[x.sym]) META[x.sym]={group:'stock',sym:x.sym,name:x.name,unit:x.unit||'',kind:'pct',why:'직접 추가한 종목',stock:true,extra:true}; });
   return j;
 }
 async function loadLive(){
@@ -1011,7 +1015,7 @@ function renderInsights(){
 /* ---- 내 화면 설정 (localStorage) ---- */
 const DEFAULT_PREFS = { watch:['HG=F','CL=F','GC=F','KRW=X','^KS11','^TNX','CUGOLD','^VIX'], hidden:[], mine:false, hold:{} };
 let PREFS = loadPrefs();
-function loadPrefs(){ try{ const p=JSON.parse(localStorage.getItem('cmPrefs')); if(p&&Array.isArray(p.watch)) return Object.assign({},DEFAULT_PREFS,p,{watch:p.watch.filter(s=>META[s])}); }catch(_){} return JSON.parse(JSON.stringify(DEFAULT_PREFS)); }
+function loadPrefs(){ try{ const p=JSON.parse(localStorage.getItem('cmPrefs')); if(p&&Array.isArray(p.watch)) return Object.assign({},DEFAULT_PREFS,p); }catch(_){} return JSON.parse(JSON.stringify(DEFAULT_PREFS)); }
 function savePrefs(){ try{ localStorage.setItem('cmPrefs', JSON.stringify(PREFS)); }catch(_){} }
 const SECTIONS = [['s-world','오늘의 세계'],['s-watch','내 관심종목'],['s-lens','4개 렌즈'],['s-top','눈에 띄는 신호'],['s-sec','섹터'],...GROUPS.map(([g,l])=>['g-'+g,l])];
 const isHidden = id=>PREFS.hidden.includes(id);
@@ -1020,6 +1024,7 @@ function renderEdit(){
   $('eWatch').innerHTML = PREFS.watch.length ? PREFS.watch.map((s,i)=>`<div class="erow"><span class="nmx">${nm(s)}</span>
     <button data-mv="${i}" data-d="-1" ${i===0?'disabled':''} aria-label="위로">↑</button><button data-mv="${i}" data-d="1" ${i===PREFS.watch.length-1?'disabled':''} aria-label="아래로">↓</button><button data-rm="${s}" aria-label="빼기">✕</button></div>`).join('') : '<div class="empty">관심종목이 없습니다. 아래에서 추가하세요.</div>';
   $('eAll').innerHTML = GROUPS.map(([g,l])=>`<div class="egrp"><div class="gl">${l}</div>${Object.values(META).filter(m=>m.group===g).map(m=>`<span class="tog ${PREFS.watch.includes(m.sym)?'on':''}" data-tg="${m.sym}">${m.name}</span>`).join('')}</div>`).join('')
+    + (()=>{ const ex=Object.values(META).filter(m=>m.extra); return ex.length?`<div class="egrp"><div class="gl">직접 추가한 종목</div>${ex.map(m=>`<span class="tog ${PREFS.watch.includes(m.sym)?'on':''}" data-tg="${m.sym}">${esc(m.name)}</span>`).join('')}</div>`:''; })()
     + SECTORS.map(sec=>`<div class="egrp"><div class="gl">섹터 · ${sec.name}</div>${sec.stocks.map(([sym,name])=>`<span class="tog ${PREFS.watch.includes(sym)?'on':''}" data-tg="${sym}">${name}</span>`).join('')}</div>`).join('');
   $('eSecs').innerHTML = SECTIONS.map(([id,l])=>`<label class="erow"><input type="checkbox" data-sec="${id}" ${isHidden(id)?'':'checked'}> ${l}</label>`).join('');
   $('eMine').checked = !!PREFS.mine;
@@ -1243,13 +1248,13 @@ function checkCfgLink(){
   history.replaceState(null,'',location.pathname);
   const nH=Object.keys(d.o||{}).length;
   $('cfgBanner').innerHTML=`<div class="bn">다른 기기의 설정(관심종목 ${(d.w||[]).length}개${nH?', 보유 종목 '+nH+'개':''})을 이 기기에 불러올까요? 지금 이 기기의 설정은 바뀝니다.<div class="askrow" style="margin-top:8px"><button class="askb pplx" id="cfgYes">불러오기</button><button class="askb" id="cfgNo">취소</button></div></div>`;
-  $('cfgYes').onclick=()=>{ PREFS.watch=(d.w||[]).filter(s=>META[s]); PREFS.hidden=d.h||[]; PREFS.mine=!!d.m; PREFS.hold=d.o||{}; $('cfgBanner').innerHTML=''; applyPrefs(); };
+  $('cfgYes').onclick=()=>{ PREFS.watch=d.w||[]; PREFS.hidden=d.h||[]; PREFS.mine=!!d.m; PREFS.hold=d.o||{}; $('cfgBanner').innerHTML=''; applyPrefs(); };
   $('cfgNo').onclick=()=>{ $('cfgBanner').innerHTML=''; };
 }
 function renderWatch(){
   renderAcct();
   const flagged = flaggedSet();
-  $('watch').innerHTML = PREFS.watch.length ? PREFS.watch.map(s=>tile(s,flagged)).join('') : '<div class="empty">✎ 내 화면 편집에서 관심종목을 골라 보세요.</div>';
+  $('watch').innerHTML = PREFS.watch.length ? PREFS.watch.filter(s=>META[s]).map(s=>tile(s,flagged)).join('') : '<div class="empty">✎ 내 화면 편집에서 관심종목을 골라 보세요.</div>';
 }
 function flaggedSet(){ return new Set(INSIGHTS.filter(x=>x.level!=='info').flatMap(x=>x.syms.slice(0,1))); }
 let OPEN = new Set(); try{ OPEN = new Set(JSON.parse(localStorage.getItem('cmOpen')||'[]')); }catch(_){}
@@ -1541,6 +1546,8 @@ $('eShare').onclick=()=>{ const u=cfgLink(), b=$('eShare');
   if(navigator.share){ navigator.share({title:'내 시장 모니터 설정',url:u}).catch(()=>{}); return; }
   navigator.clipboard.writeText(u).then(()=>{ b.textContent='복사됨 ✓ 다른 기기에서 열어 주세요'; setTimeout(()=>b.textContent='다른 기기로 옮기기 (설정 링크 복사)',2500); }).catch(()=>{ b.textContent='복사 실패'; }); };
 checkCfgLink();
+$('addGo').onclick=()=>{ const q=$('addQ').value.trim(); if(!q) return;
+  window.open('https://github.com/inhyosong-commits/-/issues/new?title='+encodeURIComponent('종목추가: '+q)+'&body='+encodeURIComponent('아래 초록색 Submit new issue 버튼만 누르면 자동으로 추가됩니다.'),'_blank','noopener'); };
 $('eReset').onclick=()=>{ PREFS=Object.assign(JSON.parse(JSON.stringify(DEFAULT_PREFS)),{hold:PREFS.hold||{}}); applyPrefs(); };
 $('eMine').onchange=e=>{ PREFS.mine=e.target.checked; applyPrefs(); };
 document.addEventListener('change', e=>{ const c=e.target.closest('[data-sec]'); if(!c) return; const id=c.dataset.sec; PREFS.hidden = c.checked? PREFS.hidden.filter(x=>x!==id) : [...PREFS.hidden, id]; applyPrefs(); });

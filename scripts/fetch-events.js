@@ -152,6 +152,7 @@ async function earnings(syms) {
   const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
   const sb = html.slice(html.indexOf('const SECTORS = ['), html.indexOf('const STOCK_SECTOR'));
   const syms = [...new Set([...sb.matchAll(/\['([^']+)','([^']+)'\]/g)].filter(m => !/ETF/.test(m[2])).map(m => m[1]))];
+  try { for (const x of JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'config', 'extra-stocks.json'), 'utf8'))) if (!syms.includes(x.sym)) syms.push(x.sym); } catch (_) {}
   const res = { v: 2, fetchedAt: Date.now(), earnings: {}, macro: MACRO, bio: {} };
   try { res.earnings = await earnings(syms); }
   catch (e) { console.log('실적 일정 실패:', e.message); if (prev) res.earnings = prev.earnings || {}; }
