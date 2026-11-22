@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '*/15 * * * *'   # 15분마다 (GitHub 사정에 따라 몇 분 늦을 수 있음)
   workflow_dispatch:          # Actions 탭에서 수동 실행
+    inputs:
+      force_report:
+        description: 'AI 리포트를 지금 새로 쓰기'
+        type: boolean
+        default: false
   push:
     branches: [main]
 
@@ -33,6 +38,12 @@ jobs:
       - name: 뉴스 받아오기
         run: node scripts/fetch-news.js public/news.json "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/news.json"
         continue-on-error: true
+      - name: AI 종합 리포트 (Perplexity, 키가 있을 때만)
+        run: node scripts/ai-report.js public/market.json public/news.json public/report.json "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/report.json"
+        continue-on-error: true
+        env:
+          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+          FORCE_REPORT: ${{ inputs.force_report && '1' || '0' }}
       - id: pages
         uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

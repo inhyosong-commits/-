@@ -2,3 +2,4 @@ public/market.json
 node_modules/
 .DS_Store
 public/news.json
+public/report.json

@@ -180,6 +180,10 @@ button.sm{font-size:12.5px;padding:4px 10px;min-height:30px;font-weight:500}
 .relx{border-top:1px solid var(--border);padding:8px 0;font-size:12.5px;color:var(--text-secondary)}
 .relx b{color:var(--text-primary);display:block;margin-bottom:2px}
 .bpts{margin:12px 0 0;display:grid;gap:12px}
+.aitag{font-size:11.5px;color:var(--accent);font-weight:700;margin-top:12px}
+.aih{font-size:18px;font-weight:800;margin:4px 0}
+.ais{margin:0 0 4px;font-size:14px;line-height:1.65}
+#bptsWrap.folded{display:none}
 .rp .rh{font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:3px}
 .rp p{margin:0;font-size:14px;line-height:1.65;color:var(--text-secondary)}
 .rp ul{margin:0;padding-left:18px;font-size:14px;line-height:1.6;color:var(--text-secondary)}
@@ -246,7 +250,8 @@ footer{color:var(--text-muted);font-size:12px;padding:20px 20px calc(20px + env(
     <div class="wl" id="briefDate">오늘의 브리핑</div>
     <div class="wh" id="worldH">…</div>
     <div class="ws" id="worldSub"></div>
-    <div class="bpts" id="bpts"></div>
+    <div id="aiRep"></div>
+    <div id="bptsWrap"><div class="bpts" id="bpts"></div></div>
     <div class="delta" id="delta"></div>
     <div id="bnews"></div>
   </div>
@@ -477,6 +482,26 @@ const esc = x => String(x).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&
 function newsHtml(list, n, label='관련 뉴스'){
   if(!list || !list.length) return '';
   return `<div class="sec">${label}</div><ul class="news">${list.slice(0,n).map(x=>`<li>${x.en?'<em class="en">해외</em> ':''}<a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a><span>${esc(x.source||'')}${x.time?' · '+ago(x.time):''}</span></li>`).join('')}</ul>`;
+}
+let REPORT=null;
+async function loadReport(){
+  try{ const r=await fetch('report.json?t='+Date.now(),{cache:'no-store'}); if(r.ok){ const j=await r.json(); if(j&&j.sections&&j.generatedAt&&Date.now()-j.generatedAt<16*3600e3) REPORT=j; else REPORT=null; } }catch(_){}
+}
+function renderAI(){
+  const box=$('aiRep'), wrap=$('bptsWrap');
+  if(!REPORT){ box.innerHTML=''; wrap.classList.remove('folded'); return; }
+  const t=new Date(REPORT.generatedAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'});
+  const host=u=>{ try{ return new URL(u).hostname.replace(/^www\./,''); }catch(_){ return u; } };
+  const para=x=>esc(x).replace(/\n+/g,'<br>');
+  box.innerHTML = `<div class="aitag">AI 보고서 · ${t} 작성 · 국내외 뉴스 종합</div>
+    ${REPORT.headline?`<div class="aih">${esc(REPORT.headline)}</div>`:''}
+    ${REPORT.summary?`<p class="ais">${para(REPORT.summary)}</p>`:''}
+    <div class="bpts">${(REPORT.sections||[]).map((x,i)=>`<div class="rp"><div class="rh">${i+1}. ${esc(x.title||'')}</div><p>${para(x.body||'')}</p></div>`).join('')}
+    ${REPORT.watch&&REPORT.watch.length?`<div class="rp"><div class="rh">체크 일정</div><ul>${REPORT.watch.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>`:''}</div>
+    ${REPORT.citations&&REPORT.citations.length?`<details class="rel"><summary>출처 ${REPORT.citations.length}곳 ▾</summary><ul class="news">${REPORT.citations.map(u=>`<li><a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(host(u))}</a></li>`).join('')}</ul></details>`:''}
+    <p class="note" style="margin:8px 0 0">AI가 뉴스를 검색해 쓴 해설이라 틀릴 수 있습니다. 투자 판단의 근거로 단독 사용하지 마세요. <a href="#" class="lk" id="showRule">숫자 기반 요약 보기</a></p>`;
+  $('showRule').onclick=e=>{ e.preventDefault(); wrap.classList.toggle('folded'); };
+  wrap.classList.add('folded');
 }
 async function loadNews(){
   try{ const r=await fetch('news.json?t='+Date.now(),{cache:'no-store'}); if(r.ok){ const j=await r.json(); if(j&&j.topics) NEWS=j; } }catch(_){}
@@ -888,7 +913,7 @@ function spark(c){
 function renderRegime(){
   const RG = regime(METRICS), W = worldHeadline(RG, INSIGHTS);
   $('worldH').textContent = W.h;
-  renderDelta(RG); renderBrief(W);
+  renderDelta(RG); renderBrief(W); renderAI();
   $('worldSub').innerHTML = W.sub;
   $('regime').innerHTML = RG.map(r=>{
     if(r.v==null) return `<div class="rtile"><div class="lbl">${r.k}</div><div class="val">–</div></div>`;
@@ -1161,7 +1186,7 @@ async function refresh(){
   METRICS={}; for(const s of Object.keys(META)){ const m=metrics(s,DATA[s]); if(m) METRICS[s]=m; }
   INSIGHTS = buildInsights(METRICS);
   try{ PREV = computePrev(res.items); }catch(e){ PREV=null; console.warn(e); }
-  if(SRC!=='api') await loadNews();
+  if(SRC!=='api'){ await loadNews(); await loadReport(); }
   const st=$('status');
   if(MODE==='live'){ st.className='badge live'; st.textContent= SRC==='static'?'실제 시세':'실시간(약 15분 지연)'; }
   else { st.className='badge demo'; st.textContent='데모 데이터'; st.title='로컬 서버(node server.js)로 실행하면 실제 시세를 받아옵니다'; }
