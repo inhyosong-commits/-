@@ -1,0 +1,39 @@
+name: 시세 갱신 및 배포
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # 15분마다 (GitHub 사정에 따라 몇 분 늦을 수 있음)
+  workflow_dispatch:          # Actions 탭에서 수동 실행
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - id: pages
+        uses: actions/configure-pages@v5
+      - name: 시세 받아오기
+        run: node scripts/fetch-data.js public/market.json "${{ steps.pages.outputs.base_url }}/market.json"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - id: deployment
+        uses: actions/deploy-pages@v4
